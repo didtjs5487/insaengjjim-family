@@ -10,12 +10,6 @@
     </linearGradient>
   </defs>
   <rect width="100" height="100" fill="url(#sky)"/>
-  <g fill="none" stroke="#4A4550" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="24,50 50,28 76,50"/>
-    <path d="M32,50 V76 H68 V50"/>
-    <path d="M26,76 H74"/>
-    <path d="M45,76 V63 H55 V76"/>
-  </g>
-  <circle cx="52.5" cy="70" r="1.1" fill="#4A4550"/>
-  <path d="M50,45.5 C48,41.3 42.8,42 42.8,45.4 C42.8,48.3 47.5,50.4 50,52.4 C52.5,50.4 57.2,48.3 57.2,45.4 C57.2,42 52,41.3 50,45.5 Z" fill="#FF8FB3"/>
+  <path d="M34,24 H66 V78 L50,62 L34,78 Z" fill="none" stroke="#4A4550" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M50,38 C48.3,34.4 43.6,35.1 43.6,38.3 C43.6,41 47.5,43 50,44.9 C52.5,43 56.4,41 56.4,38.3 C56.4,35.1 51.7,34.4 50,38 Z" fill="#FF8FB3"/>
 </svg>
