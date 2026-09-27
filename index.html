@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 
@@ -121,7 +121,10 @@
           <button type="button" class="wish-cat-btn" data-wish-cat="gift">🛍️ 갖고 싶은 것</button>
         </div>
         <input type="text" id="wish-notes" placeholder="상세정보 (선택 · 위치, 특징 등)">
-        <input type="text" id="wish-link" placeholder="링크 (선택 · 인스타, 블로그, 지도 등)" inputmode="url" autocapitalize="off" autocorrect="off">
+        <div class="link-paste-row">
+          <input type="text" id="wish-link" placeholder="링크 (선택 · 인스타, 블로그, 지도 등)" inputmode="url" autocapitalize="off" autocorrect="off">
+          <button type="button" class="paste-btn" data-target="wish-link" aria-label="클립보드에서 붙여넣기">📋</button>
+        </div>
         <button type="submit" class="btn btn-pin btn-small wish-submit-btn">🔖 담기</button>
       </form>
     </div>
@@ -253,7 +256,10 @@
       <input type="text" id="wish-detail-notes-input" placeholder="위치, 사이즈, 가격대 등">
 
       <label class="field-label">링크</label>
-      <input type="text" id="wish-detail-link-input" placeholder="인스타, 블로그, 지도 등" inputmode="url" autocapitalize="off" autocorrect="off">
+      <div class="link-paste-row">
+        <input type="text" id="wish-detail-link-input" placeholder="인스타, 블로그, 지도 등" inputmode="url" autocapitalize="off" autocorrect="off">
+        <button type="button" class="paste-btn" data-target="wish-detail-link-input" aria-label="클립보드에서 붙여넣기">📋</button>
+      </div>
 
       <div class="modal-actions">
         <button type="button" id="btn-delete-wish" class="btn btn-ghost">삭제</button>
@@ -358,6 +364,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>

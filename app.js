@@ -9,6 +9,23 @@ firebase.initializeApp(cfg);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+/* ===================== Web Share Target capture (Android: "공유" → 인생찜) =====================
+   Runs immediately so the shared payload survives before anything else executes, and the
+   query string is scrubbed right away so a reload/back-navigation doesn't re-trigger it. */
+let pendingSharedWish = null;
+(function captureShareTarget() {
+  const params = new URLSearchParams(location.search);
+  const sharedUrl = params.get('url') || '';
+  const sharedText = params.get('text') || '';
+  const sharedTitle = params.get('title') || '';
+  if (!sharedUrl && !sharedText && !sharedTitle) return;
+  const urlMatch = (sharedUrl || sharedText).match(/https?:\/\/\S+/);
+  const link = urlMatch ? urlMatch[0] : (sharedUrl || '');
+  const title = sharedTitle || (sharedText && !urlMatch ? sharedText : '');
+  if (link || title) pendingSharedWish = { link, title: title.slice(0, 80), text: sharedText };
+  history.replaceState(null, '', location.pathname);
+})();
+
 /* ===================== Constants ===================== */
 const MEMBER_COLORS = [
   { name: 'sage',     hex: '#7A8B69' },
@@ -310,6 +327,10 @@ function enterFamily(familyId) {
     });
 
   showScreen('screen-app');
+  if (pendingSharedWish) {
+    applySharedWish(pendingSharedWish);
+    pendingSharedWish = null;
+  }
 }
 
 /* ===================== Notifications ===================== */
@@ -651,12 +672,57 @@ const WISH_NOTES_EXAMPLES = {
 };
 
 let selectedWishCat = 'place';
+function setWishCatPicker(cat) {
+  selectedWishCat = cat;
+  document.querySelectorAll('#wish-cat-picker .wish-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.wishCat === cat));
+  document.getElementById('wish-notes').placeholder = `상세정보 (선택 · ${WISH_NOTES_EXAMPLES[cat]})`;
+}
 document.querySelectorAll('#wish-cat-picker .wish-cat-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#wish-cat-picker .wish-cat-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedWishCat = btn.dataset.wishCat;
-    document.getElementById('wish-notes').placeholder = `상세정보 (선택 · ${WISH_NOTES_EXAMPLES[selectedWishCat]})`;
+  btn.addEventListener('click', () => setWishCatPicker(btn.dataset.wishCat));
+});
+
+/* Best-effort guess from the shared link/caption — only acts when fairly confident,
+   otherwise leaves the category on whatever was last picked (sticky) */
+function guessWishCategory(url, text) {
+  const combined = `${url || ''} ${text || ''}`.toLowerCase();
+  if (/map\.naver\.com|naver\.me\/|map\.kakao\.com|kko\.to|maps\.google|goo\.gl\/maps/.test(combined)) return 'place';
+  const foodWords = ['맛집', '카페', '레스토랑', '메뉴', '맛있', '디저트', '베이커리', '브런치', '식당', '술집', '분식'];
+  const placeWords = ['여행', '관광', '가볼만한', '핫플', '명소', '드라이브', '숙소', '호텔', '펜션', '캠핑'];
+  const giftWords = ['구매', '쇼핑', '할인', '상품', '주문', '세일', '브랜드', '제품', '아이템'];
+  if (foodWords.some(k => combined.includes(k))) return 'food';
+  if (placeWords.some(k => combined.includes(k))) return 'place';
+  if (giftWords.some(k => combined.includes(k))) return 'gift';
+  return null;
+}
+
+/* Apply a link shared in from another app (Instagram/YouTube/네이버지도 "공유" → 인생찜) */
+function applySharedWish({ link, title, text }) {
+  applyGoodsView('wish');
+  const guess = guessWishCategory(link, text);
+  if (guess) setWishCatPicker(guess);
+  document.getElementById('wish-title').value = title || '';
+  document.getElementById('wish-link').value = link || '';
+  const form = document.getElementById('form-wish-add');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('wish-title').focus();
+  toast('공유된 링크를 담았어요 🔖 나머지 정보를 채워주세요');
+}
+
+/* "📋 붙여넣기" — a tap-triggered clipboard read works everywhere (Safari requires the
+   read to happen inside a direct user gesture, so this is more reliable than auto-detecting) */
+document.querySelectorAll('.paste-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!text) { toast('클립보드가 비어있어요'); return; }
+      document.getElementById(btn.dataset.target).value = text;
+      if (btn.dataset.target === 'wish-link') {
+        const guess = guessWishCategory(text, '');
+        if (guess) setWishCatPicker(guess);
+      }
+    } catch (err) {
+      toast('클립보드 읽기 권한이 필요해요');
+    }
   });
 });
 
@@ -832,9 +898,8 @@ document.getElementById('form-wish-add').addEventListener('submit', async (e) =>
     input.value = '';
     if (notesInput) notesInput.value = '';
     if (linkInput) linkInput.value = '';
-    selectedWishCat = 'place';
-    document.querySelectorAll('#wish-cat-picker .wish-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.wishCat === 'place'));
-    document.getElementById('wish-notes').placeholder = `상세정보 (선택 · ${WISH_NOTES_EXAMPLES.place})`;
+    // category stays as-is (sticky) — adding several items of the same kind in a row shouldn't
+    // require re-tapping the category every time
     toast(`"${title}" 담았어요 🔖`);
   } catch (err) {
     if (err.code === 'permission-denied') toast('위시리스트 권한 설정이 필요해요 (규칙 재게시)');
