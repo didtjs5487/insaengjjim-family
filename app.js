@@ -429,7 +429,10 @@ function buildTaskCard(t) {
   `;
   card.querySelector('.task-checkbox').addEventListener('click', (e) => {
     e.stopPropagation();
-    toggleTaskDone(t);
+    e.currentTarget.classList.add('checked');
+    e.currentTarget.innerHTML = icon('check', 'ic-sm');
+    card.classList.add('done');
+    setTimeout(() => { toggleTaskDone(t); toast('보관함으로 보냈어요'); }, 350);
   });
   card.querySelector('.task-body').addEventListener('click', () => openTaskModal(t));
   return card;
@@ -440,11 +443,10 @@ function renderTasks() {
   const list = document.getElementById('tasks-list');
   if (!list) return;
   list.innerHTML = '';
-  const tasks = Object.values(state.tasks)
-    .sort((a,b) => (a.done === b.done) ? 0 : (a.done ? 1 : -1));
+  const tasks = Object.values(state.tasks).filter(t => !t.done);
 
   if (tasks.length === 0) {
-    list.innerHTML = '<p class="empty-state"><b>집안일이 없어요</b>위쪽 추가 버튼으로 만들어보세요.</p>';
+    list.innerHTML = '<p class="empty-state"><b>남은 집안일이 없어요</b>위쪽 추가 버튼으로 만들어보세요. 끝낸 건 보관함에 있어요.</p>';
     return;
   }
   tasks.forEach(t => list.appendChild(buildTaskCard(t)));
@@ -535,13 +537,18 @@ document.getElementById('btn-delete-task').addEventListener('click', async () =>
 });
 
 /* ===================== Request tab: 위시 / 집안일 / 장보기 sub-view toggle (per-device) ===================== */
-const GOODS_VIEWS = ['wish', 'tasks', 'shopping'];
+const GOODS_VIEWS = ['wish', 'tasks', 'shopping', 'archive'];
 function applyGoodsView(view) {
   if (!GOODS_VIEWS.includes(view)) view = 'wish';
   localStorage.setItem('goodsView', view);
   GOODS_VIEWS.forEach(v => document.getElementById(`goods-view-${v}`).classList.toggle('hidden', v !== view));
   document.querySelectorAll('.status-chip').forEach(b => b.classList.toggle('active', b.dataset.goodsView === view));
+  document.getElementById('btn-archive').classList.toggle('active', view === 'archive');
 }
+document.getElementById('btn-archive').addEventListener('click', () => {
+  showTab('request');
+  applyGoodsView(document.getElementById('goods-view-archive').classList.contains('hidden') ? 'archive' : 'wish');
+});
 document.querySelectorAll('.status-chip').forEach(btn => {
   btn.addEventListener('click', () => applyGoodsView(btn.dataset.goodsView));
 });
@@ -552,7 +559,68 @@ function renderRequestStatus() {
   setCount('status-count-tasks', Object.values(state.tasks).filter(t => !t.done).length);
   setCount('status-count-shopping', Object.values(state.shopping).filter(i => !i.purchased).length);
   setCount('status-count-wish', Object.values(state.wishes).filter(w => !w.done).length);
+  renderArchive();
 }
+
+/* ===================== 보관함: 끝낸 위시·집안일·장보기를 한곳에 ===================== */
+const archiveUi = { kind: 'all' };
+const ARCHIVE_KINDS = { wish: '위시', task: '집안일', shopping: '장보기' };
+const tsMs = (t) => (t && t.seconds ? t.seconds * 1000 : 0);
+
+function archiveItems() {
+  const out = [];
+  const shopColl = () => db.collection('families').doc(state.familyId).collection('shopping');
+  Object.values(state.wishes).filter(w => w.done).forEach(w => out.push({
+    kind: 'wish', cat: catOf(w), title: w.title, time: tsMs(w.doneAt), stamp: w.doneAt,
+    open: () => openWishModal(w), restore: () => { toggleWishDone(w); toast('다시 꺼냈어요'); },
+  }));
+  Object.values(state.tasks).filter(t => t.done).forEach(t => out.push({
+    kind: 'task', title: t.title, time: tsMs(t.completedAt), stamp: t.completedAt,
+    open: () => openTaskModal(t), restore: () => { toggleTaskDone(t); toast('다시 꺼냈어요'); },
+  }));
+  Object.values(state.shopping).filter(i => i.purchased).forEach(i => out.push({
+    kind: 'shopping', title: i.name + (i.qty ? ' ' + i.qty : ''), time: tsMs(i.purchasedAt), stamp: i.purchasedAt,
+    restore: () => { shopColl().doc(i.id).update({ purchased: false, purchasedBy: null, purchasedAt: null }); toast('다시 꺼냈어요'); },
+    remove: () => shopColl().doc(i.id).delete(),
+  }));
+  return out.sort((a, b) => b.time - a.time);
+}
+
+function renderArchive() {
+  const list = document.getElementById('archive-list');
+  if (!list) return;
+  const all = archiveItems();
+  document.getElementById('arch-num-all').textContent = all.length;
+  Object.keys(ARCHIVE_KINDS).forEach(k => { document.getElementById('arch-num-' + k).textContent = all.filter(x => x.kind === k).length; });
+  document.querySelectorAll('#archive-seg button').forEach(b => b.classList.toggle('on', b.dataset.akind === archiveUi.kind));
+  const items = archiveUi.kind === 'all' ? all : all.filter(x => x.kind === archiveUi.kind);
+  list.innerHTML = '';
+  if (items.length === 0) {
+    list.innerHTML = '<p class="empty-state"><b>보관함이 비어 있어요</b>끝낸 위시·집안일·장보기가 여기로 와요.</p>';
+    return;
+  }
+  items.forEach(it => {
+    const row = document.createElement('div');
+    row.className = 'arch-row';
+    row.dataset.kind = it.kind;
+    if (it.cat) row.dataset.cat = it.cat;
+    const tag = it.kind === 'wish' ? WISH_CAT_META[it.cat].label : ARCHIVE_KINDS[it.kind];
+    row.innerHTML = `
+      <span class="arch-tag">${escapeHtml(tag)}</span>
+      <button type="button" class="arch-main"><span class="arch-title">${escapeHtml(it.title)}</span><span class="arch-date">${shortDate(it.stamp)}</span></button>
+      <button type="button" class="arch-restore">${icon('undo', 'ic-sm')}다시 꺼내기</button>
+      ${it.remove ? `<button type="button" class="arch-del" aria-label="완전히 지우기">${icon('x', 'ic-sm')}</button>` : ''}`;
+    const main = row.querySelector('.arch-main');
+    if (it.open) main.addEventListener('click', it.open); else main.disabled = true;
+    row.querySelector('.arch-restore').addEventListener('click', it.restore);
+    const del = row.querySelector('.arch-del');
+    if (del) del.addEventListener('click', it.remove);
+    list.appendChild(row);
+  });
+}
+document.querySelectorAll('#archive-seg button').forEach(btn => {
+  btn.addEventListener('click', () => { archiveUi.kind = btn.dataset.akind; renderArchive(); });
+});
 
 /* ===================== Shopping / household supplies ===================== */
 function renderShopping() {
@@ -560,12 +628,12 @@ function renderShopping() {
   const list = document.getElementById('shopping-list');
   if (!list) return;
   list.innerHTML = '';
-  // 체크하면 목록에서 빠진다 — 예전에 "구매 완료"로 남은 항목은 보이지 않게 거른다
+  // 체크하면 목록에서 빠져 보관함으로 간다
   const items = Object.values(state.shopping)
     .filter(i => !i.purchased)
     .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
   if (items.length === 0) {
-    list.innerHTML = '<p class="empty-state">살 것이 없어요. 위에 적어서 추가하세요.</p>';
+    list.innerHTML = '<p class="empty-state">살 것이 없어요. 위에 적어서 추가하세요. 산 것은 보관함에 있어요.</p>';
     return;
   }
   items.forEach(item => {
@@ -582,7 +650,9 @@ function renderShopping() {
       e.currentTarget.innerHTML = icon('check', 'ic-sm');
       row.classList.add('purchased');
       setTimeout(() => {
-        db.collection('families').doc(state.familyId).collection('shopping').doc(item.id).delete();
+        db.collection('families').doc(state.familyId).collection('shopping').doc(item.id).update({
+          purchased: true, purchasedBy: state.memberId, purchasedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
       }, 350);
     });
     list.appendChild(row);

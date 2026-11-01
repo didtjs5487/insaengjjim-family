@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gugi&family=JetBrains+Mono:wght@500&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=22">
+<link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 
@@ -43,6 +43,7 @@
   <symbol id="i-mark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></symbol>
   <symbol id="i-task" viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
   <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8M10 12h4"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
 </svg>
 
@@ -94,6 +95,7 @@
         <span class="family-name" id="family-name-label"></span>
       </div>
       <div class="header-right">
+        <button id="btn-archive" class="icon-btn" title="보관함" aria-label="보관함"><svg class="ic"><use href="#i-box"/></svg></button>
         <button id="btn-notif" class="icon-btn" title="알림 켜기" aria-label="알림 켜기"><svg class="ic"><use href="#i-bell"/></svg></button>
         <button id="btn-settings" class="icon-btn" title="설정" aria-label="설정"><svg class="ic"><use href="#i-gear"/></svg></button>
       </div>
@@ -158,6 +160,23 @@
         <span class="sort-note">최신순</span>
       </div>
       <div id="wish-list" class="list"></div>
+    </div>
+
+    <!-- 보관함: 끝낸 위시·집안일·장보기 -->
+    <div id="goods-view-archive" class="hidden">
+      <div class="section-header">
+        <h2 class="section-title">보관함</h2>
+      </div>
+      <p class="archive-note">끝낸 것들이 여기 모여요. 다시 필요해지면 "다시 꺼내기"를 누르세요.</p>
+      <div class="list-head">
+        <div class="seg" id="archive-seg" role="group" aria-label="종류 선택">
+          <button type="button" class="on" data-akind="all">전체 <span class="num" id="arch-num-all">0</span></button>
+          <button type="button" data-akind="wish">위시 <span class="num" id="arch-num-wish">0</span></button>
+          <button type="button" data-akind="task">집안일 <span class="num" id="arch-num-task">0</span></button>
+          <button type="button" data-akind="shopping">장보기 <span class="num" id="arch-num-shopping">0</span></button>
+        </div>
+      </div>
+      <div id="archive-list" class="list"></div>
     </div>
 
     <!-- 집안일 -->
@@ -390,6 +409,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
