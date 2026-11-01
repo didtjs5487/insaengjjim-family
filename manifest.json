@@ -6,8 +6,8 @@
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FFE1EC",
-  "theme_color": "#FFE1EC",
+  "background_color": "#07080f",
+  "theme_color": "#07080f",
   "lang": "ko",
   "categories": ["lifestyle", "productivity"],
   "icons": [
@@ -18,12 +18,14 @@
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ],
   "share_target": {
-    "action": "./",
-    "method": "GET",
+    "action": "./?share=1",
+    "method": "POST",
+    "enctype": "multipart/form-data",
     "params": {
       "title": "title",
       "text": "text",
-      "url": "url"
+      "url": "url",
+      "files": [{ "name": "photo", "accept": ["image/*"] }]
     }
   }
 }

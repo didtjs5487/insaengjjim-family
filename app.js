@@ -18,11 +18,12 @@ let pendingSharedWish = null;
   const sharedUrl = params.get('url') || '';
   const sharedText = params.get('text') || '';
   const sharedTitle = params.get('title') || '';
-  if (!sharedUrl && !sharedText && !sharedTitle) return;
+  const hasPhoto = params.get('photo') === '1';
+  if (!sharedUrl && !sharedText && !sharedTitle && !hasPhoto) return;
   const urlMatch = (sharedUrl || sharedText).match(/https?:\/\/\S+/);
   const link = urlMatch ? urlMatch[0] : (sharedUrl || '');
   const title = sharedTitle || (sharedText && !urlMatch ? sharedText : '');
-  if (link || title) pendingSharedWish = { link, title: title.slice(0, 80), text: sharedText };
+  pendingSharedWish = { link, title: title.slice(0, 80), text: sharedText, hasPhoto };
   history.replaceState(null, '', location.pathname);
 })();
 
@@ -66,8 +67,6 @@ const state = {
   shopping: {},          // itemId -> shopping item data
   wishes: {},            // wishId -> wishlist item data
   wishFilter: 'all',
-  notices: {},           // noticeId -> notice data
-  shownNudges: {},       // noticeId -> last nudge timestamp we already toasted
   anniversaries: {},     // annivId -> anniversary data
   editingTaskId: null,
   editingAnniversaryId: null,
@@ -91,6 +90,10 @@ function showTab(name) {
 }
 document.getElementById('btn-settings').addEventListener('click', () => showTab('family'));
 document.getElementById('btn-settings-back').addEventListener('click', () => showTab('request'));
+
+function icon(name, cls = '') {
+  return `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+}
 
 function toast(msg) {
   const c = document.getElementById('toast-container');
@@ -250,7 +253,6 @@ function teardownFamilyListeners() {
   if (state.unsubTasks) { state.unsubTasks(); state.unsubTasks = null; }
   if (state.unsubShopping) { state.unsubShopping(); state.unsubShopping = null; }
   if (state.unsubWishes) { state.unsubWishes(); state.unsubWishes = null; }
-  if (state.unsubNotices) { state.unsubNotices(); state.unsubNotices = null; }
   if (state.unsubAnniversaries) { state.unsubAnniversaries(); state.unsubAnniversaries = null; }
 }
 
@@ -293,31 +295,6 @@ function enterFamily(familyId) {
       renderWishes();
     });
 
-  state.unsubNotices = db.collection('families').doc(familyId).collection('notices')
-    .orderBy('createdAt', 'desc')
-    .onSnapshot(snap => {
-      // "콕 찌르기" — toast when someone pokes me about a notice I haven't read
-      snap.docChanges().forEach(change => {
-        if (change.type !== 'modified') return;
-        const n = change.doc.data();
-        if (n.nudge && n.nudge.by && n.nudge.by !== state.memberId && n.nudge.at &&
-            (!n.readBy || !n.readBy.includes(state.memberId)) &&
-            !change.doc.metadata.hasPendingWrites) {
-          const key = n.nudge.at.seconds || Date.now();
-          if (state.shownNudges[change.doc.id] !== key) {
-            state.shownNudges[change.doc.id] = key;
-            const who = state.members[n.nudge.by]?.name || '가족';
-            notifyUser(`${who}님이 확인을 기다리고 있어요!`, (n.text || '').slice(0, 30));
-          }
-        }
-      });
-      state.notices = {};
-      snap.forEach(doc => { state.notices[doc.id] = { id: doc.id, ...doc.data() }; });
-      renderNotices();
-      renderNoticeBanner();
-      markNoticesReadIfVisible();
-    });
-
   state.unsubAnniversaries = db.collection('families').doc(familyId).collection('anniversaries')
     .onSnapshot(snap => {
       state.anniversaries = {};
@@ -358,7 +335,7 @@ function renderMembers() {
       <span>${escapeHtml(m.name)}</span>
       <span class="member-row-right">
         ${memberId === state.memberId ? '<span class="member-you">나</span>' : ''}
-        <button class="member-delete-btn" title="구성원 삭제" aria-label="구성원 삭제">✕</button>
+        <button class="member-delete-btn" title="구성원 삭제" aria-label="구성원 삭제">${icon('x', 'ic-sm')}</button>
       </span>
     `;
     row.querySelector('.member-delete-btn').addEventListener('click', () => {
@@ -421,7 +398,7 @@ function renderAssigneeOptions() {
     const sel = document.getElementById(id);
     if (!sel) return;
     const prev = sel.value;
-    sel.innerHTML = '<option value="all">👪 전체</option>' +
+    sel.innerHTML = '<option value="all">전체</option>' +
       Object.entries(state.members).map(([uid,m]) => `<option value="${uid}">${escapeHtml(m.name)}</option>`).join('');
     if (prev) sel.value = prev;
   });
@@ -450,12 +427,12 @@ function buildTaskCard(t) {
     repeatLabel = wds.length ? '매주 ' + wds.map(d => WEEKDAYS_KO[d]).join('·') : '매주 반복';
   }
   card.innerHTML = `
-    <span class="task-checkbox ${t.done ? 'checked' : ''}">${t.done ? '✓' : ''}</span>
+    <button type="button" class="task-checkbox ${t.done ? 'checked' : ''}" aria-label="${t.done ? '완료 취소' : '완료'}">${t.done ? icon('check', 'ic-sm') : ''}</button>
     <div class="task-body">
       <p class="task-title">${escapeHtml(t.title)}</p>
       <div class="task-meta">
         <span class="event-assignee-badge">
-          <span class="avatar-dot" style="background:${colorForAssignee(t.assignee)}">${t.assignee==='all'?'👪':initialsFor(assigneeName)}</span>
+          <span class="avatar-dot" style="background:${colorForAssignee(t.assignee)}">${t.assignee==='all'?'전':initialsFor(assigneeName)}</span>
           ${escapeHtml(assigneeName)}
         </span>
         ${t.dueDate ? `<span>~${t.dueDate}</span>` : ''}
@@ -480,7 +457,7 @@ function renderTasks() {
     .sort((a,b) => (a.done === b.done) ? 0 : (a.done ? 1 : -1));
 
   if (tasks.length === 0) {
-    list.innerHTML = '<p class="empty-state">집안일이 없어요. 오른쪽 위 버튼으로 추가해보세요.</p>';
+    list.innerHTML = '<p class="empty-state"><b>집안일이 없어요</b>위쪽 추가 버튼으로 만들어보세요.</p>';
     return;
   }
   tasks.forEach(t => list.appendChild(buildTaskCard(t)));
@@ -608,16 +585,16 @@ function renderShopping() {
     const requesterName = state.members[item.requestedBy]?.name || '?';
     const priceLabel = item.price != null ? `${Number(item.price).toLocaleString('ko-KR')}원` : '';
     row.innerHTML = `
-      <span class="task-checkbox ${item.purchased ? 'checked' : ''}">${item.purchased ? '✓' : ''}</span>
+      <button type="button" class="task-checkbox ${item.purchased ? 'checked' : ''}" aria-label="${item.purchased ? '구매 취소' : '구매 완료'}">${item.purchased ? icon('check', 'ic-sm') : ''}</button>
       <div class="shopping-body">
         <span class="shopping-name">${escapeHtml(item.name)}${item.qty ? ` <span class="shopping-qty">${escapeHtml(item.qty)}</span>` : ''}</span>
         ${(priceLabel || item.link) ? `<span class="shopping-sub">
           ${priceLabel ? `<span class="shopping-price">${priceLabel}</span>` : ''}
-          ${item.link ? `<a class="shopping-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">🔗 구매 링크</a>` : ''}
+          ${item.link ? `<a class="shopping-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">구매 링크</a>` : ''}
         </span>` : ''}
         <span class="shopping-meta">${escapeHtml(requesterName)}님 요청</span>
       </div>
-      <button class="shopping-delete-btn" title="삭제" aria-label="삭제">✕</button>
+      <button class="shopping-delete-btn" title="삭제" aria-label="삭제">${icon('x', 'ic-sm')}</button>
     `;
     row.querySelector('.task-checkbox').addEventListener('click', () => toggleShoppingPurchased(item));
     row.querySelector('.shopping-delete-btn').addEventListener('click', (e) => {
@@ -658,27 +635,158 @@ document.getElementById('form-shopping-add').addEventListener('submit', async (e
   toast(`"${name}" 추가했어요`);
 });
 
-/* ===================== Wishlist: 인스타/SNS에서 본 가고 싶은 곳 · 먹고 싶은 음식 · 갖고 싶은 것 ===================== */
+/* ===================== Wishlist: 장소 · 음식 · 물건 ===================== */
 const WISH_CATEGORIES = ['place', 'food', 'gift'];
 const WISH_CAT_META = {
-  place: { emoji: '📍', label: '가고 싶은 곳' },
-  food: { emoji: '🍽️', label: '먹고 싶은 음식' },
-  gift: { emoji: '🛍️', label: '갖고 싶은 것' },
+  place: { icon: 'pin',  label: '장소', long: '가고 싶은 곳',   done: '다녀왔어요', hint: '위치, 특징 등' },
+  food:  { icon: 'food', label: '음식', long: '먹고 싶은 음식', done: '먹었어요',   hint: '가게 이름, 메뉴 등' },
+  gift:  { icon: 'bag',  label: '물건', long: '갖고 싶은 것',   done: '샀어요',     hint: '사이즈, 색상, 가격대 등' },
 };
-const WISH_NOTES_EXAMPLES = {
-  place: '위치, 특징 등',
-  food: '가게 이름, 메뉴 등',
-  gift: '사이즈, 색상, 가격대 등',
-};
+const wishUi = { state: 'open', query: '', rendered: false, known: new Set() };
 
-let selectedWishCat = 'place';
+const wishColl = () => db.collection('families').doc(state.familyId).collection('wishes');
+const catOf = (w) => (WISH_CATEGORIES.includes(w.category) ? w.category : 'gift');
+const tsSeconds = (t) => (t && t.seconds) || Infinity;
+function shortDate(t) {
+  if (!t || !t.seconds) return '';
+  const d = new Date(t.seconds * 1000);
+  return `${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`;
+}
+function normalizeLink(raw) {
+  let link = (raw || '').trim() || null;
+  if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+  return link;
+}
+function linkHost(link) {
+  try { return new URL(link).hostname.replace(/^www\./, ''); } catch (e) { return ''; }
+}
+function youtubeId(link) {
+  try {
+    const u = new URL(link);
+    if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] || null;
+    if (u.hostname.includes('youtube.com')) {
+      if (/^\/(shorts|embed|live)\//.test(u.pathname)) return u.pathname.split('/')[2] || null;
+      return u.searchParams.get('v');
+    }
+  } catch (e) { /* not a URL */ }
+  return null;
+}
+function wishImageSrc(w) {
+  if (w.photo) return w.photo;
+  const id = w.link && youtubeId(w.link);
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
+}
+
+/* ---- photos: shrink in the browser, keep inside the wish document (no paid storage needed) ---- */
+async function imageToDataUrl(blob, max = 640, quality = 0.72) {
+  let src, w, h;
+  try {
+    src = await createImageBitmap(blob);
+    w = src.width; h = src.height;
+  } catch (e) {
+    src = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = URL.createObjectURL(blob);
+    });
+    w = src.naturalWidth; h = src.naturalHeight;
+  }
+  const scale = Math.min(1, max / Math.max(w, h));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(w * scale));
+  canvas.height = Math.max(1, Math.round(h * scale));
+  canvas.getContext('2d').drawImage(src, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+async function readClipboardPayload() {
+  try {
+    if (navigator.clipboard.read) {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const type = it.types.find(t => t.startsWith('image/'));
+        if (type) return { image: await it.getType(type) };
+      }
+      for (const it of items) {
+        if (it.types.includes('text/plain')) return { text: await (await it.getType('text/plain')).text() };
+      }
+    }
+  } catch (e) { /* fall back to plain text below */ }
+  return { text: await navigator.clipboard.readText() };
+}
+
+/* photo slots: 'add' (new-wish sheet) and 'edit' (detail sheet) */
+const photoSlots = {
+  add:  { data: null, preview: 'wish-photo-preview',      remove: 'btn-wish-photo-remove' },
+  edit: { data: null, preview: 'wish-edit-photo-preview', remove: 'btn-edit-photo-remove' },
+};
+function renderPhotoSlot(key) {
+  const s = photoSlots[key];
+  const box = document.getElementById(s.preview);
+  box.innerHTML = s.data ? `<img src="${s.data}" alt="">` : icon('image', 'ic-lg');
+  document.getElementById(s.remove).classList.toggle('hidden', !s.data);
+}
+async function setPhoto(key, blob) {
+  try {
+    photoSlots[key].data = await imageToDataUrl(blob);
+    renderPhotoSlot(key);
+  } catch (e) {
+    toast('이 사진은 불러올 수 없어요');
+  }
+}
+function wirePhotoControls(key, pickBtn, pasteBtn, removeBtn, fileInput) {
+  document.getElementById(pickBtn).addEventListener('click', () => document.getElementById(fileInput).click());
+  document.getElementById(fileInput).addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) setPhoto(key, f);
+    e.target.value = '';
+  });
+  document.getElementById(removeBtn).addEventListener('click', () => { photoSlots[key].data = null; renderPhotoSlot(key); });
+  document.getElementById(pasteBtn).addEventListener('click', async () => {
+    try {
+      const got = await readClipboardPayload();
+      if (got.image) setPhoto(key, got.image);
+      else toast('복사된 이미지가 없어요. 인스타·갤러리에서 이미지를 길게 눌러 복사해주세요');
+    } catch (e) { toast('클립보드 읽기 권한이 필요해요'); }
+  });
+}
+wirePhotoControls('add', 'btn-wish-photo-pick', 'btn-wish-photo-paste', 'btn-wish-photo-remove', 'wish-photo-file');
+wirePhotoControls('edit', 'btn-edit-photo-pick', 'btn-edit-photo-paste', 'btn-edit-photo-remove', 'wish-edit-photo-file');
+
+/* long-press → 붙여넣기 on the page also works while a sheet is open */
+document.addEventListener('paste', (e) => {
+  const f = e.clipboardData && [...e.clipboardData.files].find(x => x.type.startsWith('image/'));
+  if (!f) return;
+  if (!document.getElementById('modal-wish-add').classList.contains('hidden')) { e.preventDefault(); setPhoto('add', f); }
+  else if (!document.getElementById('form-wish-edit').classList.contains('hidden')) { e.preventDefault(); setPhoto('edit', f); }
+});
+
+/* ---- category pickers (add sheet + edit sheet) ---- */
+let selectedWishCat = localStorage.getItem('wishCat');
+if (!WISH_CATEGORIES.includes(selectedWishCat)) selectedWishCat = 'place';
+let editingWishId = null;
+let editingWishCat = 'place';
+
+function paintPicker(containerId, cat) {
+  document.querySelectorAll(`#${containerId} button`).forEach(b => b.classList.toggle('on', b.dataset.wishCat === cat));
+}
 function setWishCatPicker(cat) {
   selectedWishCat = cat;
-  document.querySelectorAll('#wish-cat-picker .wish-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.wishCat === cat));
-  document.getElementById('wish-notes').placeholder = `상세정보 (선택 · ${WISH_NOTES_EXAMPLES[cat]})`;
+  localStorage.setItem('wishCat', cat);
+  paintPicker('wish-cat-picker', cat);
+  document.getElementById('wish-notes').placeholder = WISH_CAT_META[cat].hint;
+  const card = document.getElementById('wish-add-card');
+  if (card) card.dataset.cat = cat;
 }
-document.querySelectorAll('#wish-cat-picker .wish-cat-btn').forEach(btn => {
+document.querySelectorAll('#wish-cat-picker button').forEach(btn => {
   btn.addEventListener('click', () => setWishCatPicker(btn.dataset.wishCat));
+});
+document.querySelectorAll('#wish-detail-cat-picker button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    editingWishCat = btn.dataset.wishCat;
+    paintPicker('wish-detail-cat-picker', editingWishCat);
+    document.getElementById('wish-detail-notes-input').placeholder = WISH_CAT_META[editingWishCat].hint;
+  });
 });
 
 /* Best-effort guess from the shared link/caption — only acts when fairly confident,
@@ -695,28 +803,56 @@ function guessWishCategory(url, text) {
   return null;
 }
 
-/* Apply a link shared in from another app (Instagram/YouTube/네이버지도 "공유" → 인생찜) */
-function applySharedWish({ link, title, text }) {
+/* ---- add sheet ---- */
+const wishAddModal = document.getElementById('modal-wish-add');
+function openWishAdd(prefill = {}) {
   applyGoodsView('wish');
-  const guess = guessWishCategory(link, text);
-  if (guess) setWishCatPicker(guess);
-  document.getElementById('wish-title').value = title || '';
-  document.getElementById('wish-link').value = link || '';
-  const form = document.getElementById('form-wish-add');
-  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const pickable = !!prefill.pick;
+  document.getElementById('wish-title').value = prefill.title || '';
+  document.getElementById('wish-notes').value = '';
+  document.getElementById('wish-link').value = prefill.link || '';
+  setWishCatPicker(prefill.cat || selectedWishCat);
+  const meta = WISH_CAT_META[selectedWishCat];
+  document.getElementById('wish-cat-picker').classList.toggle('hidden', !pickable);
+  document.getElementById('wish-add-card').dataset.cat = selectedWishCat;
+  document.getElementById('wish-add-heading').textContent = pickable ? '새 찜' : '새 ' + meta.label + ' 찜';
+  photoSlots.add.data = null;
+  renderPhotoSlot('add');
+  wishAddModal.classList.remove('hidden');
   document.getElementById('wish-title').focus();
-  toast('공유된 링크를 담았어요 🔖 나머지 정보를 채워주세요');
+}
+function closeWishAdd() { wishAddModal.classList.add('hidden'); }
+document.querySelectorAll('.cat-add').forEach(btn => {
+  btn.addEventListener('click', () => openWishAdd({ cat: btn.dataset.cat }));
+});
+document.getElementById('modal-wish-add-close').addEventListener('click', closeWishAdd);
+wishAddModal.addEventListener('click', (e) => { if (e.target === wishAddModal) closeWishAdd(); });
+
+/* Apply something shared in from another app (Instagram/YouTube/네이버지도 "공유" → 인생찜) */
+async function applySharedWish({ link, title, text, hasPhoto }) {
+  openWishAdd({ title, link, cat: guessWishCategory(link, text) || selectedWishCat, pick: true });
+  if (hasPhoto && window.caches) {
+    try {
+      const cache = await caches.open('share-inbox');
+      const key = new URL('share-photo', document.baseURI).href;
+      const resp = await cache.match(key);
+      if (resp) { await setPhoto('add', await resp.blob()); await cache.delete(key); }
+    } catch (e) { /* the photo is optional */ }
+  }
+  toast('공유받았어요. 이름을 확인하고 담아주세요');
 }
 
-/* "📋 붙여넣기" — a tap-triggered clipboard read works everywhere (Safari requires the
-   read to happen inside a direct user gesture, so this is more reliable than auto-detecting) */
+/* 📋 — one tap pastes whatever is on the clipboard: an image becomes the photo, text becomes the link */
 document.querySelectorAll('.paste-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
+    const isAdd = btn.dataset.target === 'wish-link';
     try {
-      const text = (await navigator.clipboard.readText()).trim();
+      const got = await readClipboardPayload();
+      if (got.image) { setPhoto(isAdd ? 'add' : 'edit', got.image); toast('사진을 붙여넣었어요'); return; }
+      const text = (got.text || '').trim();
       if (!text) { toast('클립보드가 비어있어요'); return; }
       document.getElementById(btn.dataset.target).value = text;
-      if (btn.dataset.target === 'wish-link') {
+      if (isAdd && !document.getElementById('wish-cat-picker').classList.contains('hidden')) {
         const guess = guessWishCategory(text, '');
         if (guess) setWishCatPicker(guess);
       }
@@ -726,151 +862,234 @@ document.querySelectorAll('.paste-btn').forEach(btn => {
   });
 });
 
-document.querySelectorAll('.wish-filter').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.wish-filter').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    state.wishFilter = btn.dataset.wfilter;
+document.getElementById('form-wish-add').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const title = document.getElementById('wish-title').value.trim();
+  if (!title) return;
+  const submitBtn = e.target.querySelector('button[type=submit]');
+  submitBtn.disabled = true;
+  try {
+    await wishColl().add({
+      title, category: selectedWishCat,
+      notes: document.getElementById('wish-notes').value.trim() || null,
+      link: normalizeLink(document.getElementById('wish-link').value),
+      photo: photoSlots.add.data || null,
+      done: false, requestedBy: state.memberId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    closeWishAdd();
+    state.wishFilter = 'all'; wishUi.state = 'open'; wishUi.query = '';
+    document.getElementById('wish-search').value = '';
+    renderWishes();
+    toast(`"${title}" 담았어요`);
+  } catch (err) {
+    if (err.code === 'permission-denied') toast('권한 설정이 필요해요 (규칙 재게시)');
+    else toast('담기 실패: ' + (err.code || err.message));
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+/* ---- list: tiles filter, search, 남은 것 / 다녀옴 ---- */
+document.querySelectorAll('.cat-tile').forEach(tile => {
+  tile.addEventListener('click', () => {
+    state.wishFilter = state.wishFilter === tile.dataset.cat ? 'all' : tile.dataset.cat;
     renderWishes();
   });
 });
+document.querySelectorAll('#wish-state-seg button').forEach(btn => {
+  btn.addEventListener('click', () => { wishUi.state = btn.dataset.wstate; renderWishes(); });
+});
+document.getElementById('wish-search').addEventListener('input', (e) => {
+  wishUi.query = e.target.value.trim().toLowerCase();
+  document.getElementById('wish-search-clear').classList.toggle('hidden', !e.target.value);
+  renderWishes();
+});
+document.getElementById('wish-search-clear').addEventListener('click', () => {
+  const input = document.getElementById('wish-search');
+  input.value = ''; wishUi.query = '';
+  document.getElementById('wish-search-clear').classList.add('hidden');
+  renderWishes();
+  input.focus();
+});
+
+function buildWishRow(w, ignite) {
+  const cat = catOf(w);
+  const meta = WISH_CAT_META[cat];
+  const src = wishImageSrc(w);
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'wish-row' + (w.done ? ' off' : '') + (ignite ? ' ignite' : '');
+  row.dataset.cat = cat;
+  const date = shortDate(w.done && w.doneAt ? w.doneAt : w.createdAt);
+  row.innerHTML = `
+    <span class="wish-thumb">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : icon(meta.icon, 'ic-lg')}</span>
+    <span class="wish-main">
+      <span class="wish-title">${escapeHtml(w.title)}</span>
+      ${w.notes ? `<span class="wish-note">${escapeHtml(w.notes)}</span>` : ''}
+    </span>
+    <span class="wish-side">${icon(meta.icon)}<span class="wish-date">${date}</span></span>`;
+  const img = row.querySelector('img');
+  if (img) img.addEventListener('error', () => { row.querySelector('.wish-thumb').innerHTML = icon(meta.icon, 'ic-lg'); });
+  row.addEventListener('click', () => openWishModal(w));
+  return row;
+}
 
 function renderWishes() {
   renderRequestStatus();
   const list = document.getElementById('wish-list');
   if (!list) return;
-  list.innerHTML = '';
-  let items = Object.values(state.wishes);
-  if (state.wishFilter !== 'all') items = items.filter(w => (w.category || 'gift') === state.wishFilter);
+  const all = Object.values(state.wishes);
+  const filter = state.wishFilter;
 
+  WISH_CATEGORIES.forEach(cat => {
+    document.getElementById(`tile-count-${cat}`).textContent = all.filter(w => !w.done && catOf(w) === cat).length;
+  });
+  document.querySelectorAll('.cat-tile').forEach(t => {
+    const on = t.dataset.cat === filter;
+    t.classList.toggle('on', on);
+    t.setAttribute('aria-pressed', on);
+  });
+  document.getElementById('cat-tiles').classList.toggle('has-on', filter !== 'all');
+
+  const inCat = all.filter(w => filter === 'all' || catOf(w) === filter);
+  document.getElementById('seg-open').textContent = inCat.filter(w => !w.done).length;
+  document.getElementById('seg-done').textContent = inCat.filter(w => w.done).length;
+  document.querySelectorAll('#wish-state-seg button').forEach(b => b.classList.toggle('on', b.dataset.wstate === wishUi.state));
+
+  const wantDone = wishUi.state === 'done';
+  let items = inCat.filter(w => !!w.done === wantDone);
+  if (wishUi.query) {
+    items = items.filter(w => `${w.title || ''} ${w.notes || ''}`.toLowerCase().includes(wishUi.query));
+  }
+  items.sort((a, b) => tsSeconds(b.createdAt) - tsSeconds(a.createdAt));
+
+  list.innerHTML = '';
   if (items.length === 0) {
-    list.innerHTML = '<p class="empty-state">아직 담아둔 게 없어요. 링크와 함께 하나씩 담아보세요 🔖</p>';
+    let msg;
+    if (wishUi.query) msg = `<b>찾는 찜이 없어요</b>"${escapeHtml(wishUi.query)}"에 맞는 이름이나 메모가 없어요.`;
+    else if (wantDone) msg = '<b>아직 다녀온 곳이 없어요</b>찜을 이루면 여기에 따로 모여요.';
+    else if (all.length === 0) msg = '<b>아직 담아둔 게 없어요</b>아래 + 버튼으로 첫 찜을 담아보세요.';
+    else msg = '<b>이 종류는 비어있어요</b>다른 종류를 보거나 새로 담아보세요.';
+    list.innerHTML = `<p class="empty-state">${msg}</p>`;
+    items.forEach(w => wishUi.known.add(w.id));
+    wishUi.rendered = true;
     return;
   }
 
-  // group by category (section) first so items are easy to browse by kind, not by who added them
-  const byCategory = new Map();
-  items.forEach(w => {
-    const key = WISH_CATEGORIES.includes(w.category) ? w.category : 'gift';
-    if (!byCategory.has(key)) byCategory.set(key, []);
-    byCategory.get(key).push(w);
-  });
-
-  WISH_CATEGORIES.forEach(cat => {
-    const wishItems = byCategory.get(cat);
-    if (!wishItems || wishItems.length === 0) return;
-    const meta = WISH_CAT_META[cat];
-
-    const header = document.createElement('div');
-    header.className = 'wish-group-header';
-    header.innerHTML = `<span class="wish-group-emoji">${meta.emoji}</span><span>${meta.label}</span><span class="wish-group-count">${wishItems.length}</span>`;
-    list.appendChild(header);
-
-    wishItems.sort((a,b) => (a.done === b.done) ? 0 : (a.done ? 1 : -1));
-    wishItems.forEach(w => {
-      const requester = state.members[w.requestedBy];
-      const row = document.createElement('div');
-      row.className = 'wish-item' + (w.done ? ' done' : '');
-      row.innerHTML = `
-        <span class="avatar-dot wish-requester-dot" style="background:${requester ? colorFor(requester.colorIndex) : '#B9AE94'}" title="${escapeHtml(requester?.name || '?')}">${initialsFor(requester?.name || '?')}</span>
-        <div class="wish-body">
-          <span class="wish-name">${escapeHtml(w.title)}</span>
-          ${(w.notes || w.link) ? `<span class="wish-sub">
-            ${w.notes ? `<span class="wish-notes">${escapeHtml(w.notes)}</span>` : ''}
-            ${w.link ? `<a class="wish-link" href="${escapeHtml(w.link)}" target="_blank" rel="noopener noreferrer">🔗 링크</a>` : ''}
-          </span>` : ''}
-        </div>
-        <button class="wish-heart ${w.done ? 'on' : ''}" title="이뤄졌어요">${w.done ? '💖' : '🤍'}</button>
-        <button class="wish-delete-btn" title="삭제" aria-label="삭제">✕</button>
-      `;
-      row.querySelector('.wish-body').addEventListener('click', () => openWishModal(w));
-      row.querySelector('.wish-heart').addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleWishDone(w);
-      });
-      row.querySelector('.wish-delete-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm('이 위시를 삭제할까요?')) {
-          db.collection('families').doc(state.familyId).collection('wishes').doc(w.id).delete();
-        }
-      });
-      list.appendChild(row);
+  const igniteNew = (w) => wishUi.rendered && !wishUi.known.has(w.id);
+  const grouped = filter === 'all' && !wishUi.query && !wantDone;
+  if (grouped) {
+    WISH_CATEGORIES.forEach(cat => {
+      const part = items.filter(w => catOf(w) === cat);
+      if (!part.length) return;
+      const meta = WISH_CAT_META[cat];
+      const head = document.createElement('div');
+      head.className = 'wish-sec';
+      head.dataset.cat = cat;
+      head.innerHTML = `${icon(meta.icon, 'ic-sm')}${meta.long}<span class="num">${part.length}</span>`;
+      list.appendChild(head);
+      part.forEach(w => list.appendChild(buildWishRow(w, igniteNew(w))));
     });
-  });
+  } else {
+    items.forEach(w => list.appendChild(buildWishRow(w, igniteNew(w))));
+  }
+  all.forEach(w => wishUi.known.add(w.id));
+  wishUi.rendered = true;
 }
 
 async function toggleWishDone(w) {
-  await db.collection('families').doc(state.familyId).collection('wishes').doc(w.id).update({
+  await wishColl().doc(w.id).update({
     done: !w.done,
     doneBy: !w.done ? state.memberId : null,
+    doneAt: !w.done ? firebase.firestore.FieldValue.serverTimestamp() : null,
   });
 }
 
-/* ---- Wish detail/edit modal: tap a card to see and fix what was entered ---- */
+/* ---- detail / edit sheet ---- */
 const wishModal = document.getElementById('modal-wish');
-let editingWishId = null;
-let editingWishCat = 'place';
-
-document.querySelectorAll('#wish-detail-cat-picker .wish-cat-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#wish-detail-cat-picker .wish-cat-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    editingWishCat = btn.dataset.wishCat;
-    document.getElementById('wish-detail-notes-input').placeholder = WISH_NOTES_EXAMPLES[editingWishCat];
-  });
-});
-
+function showWishViewMode(show) {
+  document.getElementById('wish-view-mode').classList.toggle('hidden', !show);
+  document.getElementById('form-wish-edit').classList.toggle('hidden', show);
+}
 function openWishModal(w) {
   editingWishId = w.id;
-  editingWishCat = WISH_CATEGORIES.includes(w.category) ? w.category : 'gift';
+  const cat = catOf(w);
+  const meta = WISH_CAT_META[cat];
   const requester = state.members[w.requestedBy];
-  document.getElementById('wish-detail-meta').textContent = `${requester?.name || '?'}님이 담음`;
+  document.getElementById('wish-detail-card').dataset.cat = cat;
 
-  document.getElementById('wish-detail-title-input').value = w.title || '';
-  document.querySelectorAll('#wish-detail-cat-picker .wish-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.wishCat === editingWishCat));
-  document.getElementById('wish-detail-notes-input').value = w.notes || '';
-  document.getElementById('wish-detail-link-input').value = w.link || '';
+  const src = wishImageSrc(w);
+  const img = document.getElementById('wish-detail-img');
+  const fallback = document.getElementById('wish-detail-fallback');
+  fallback.querySelector('use').setAttribute('href', `#i-${meta.icon}`);
+  if (src) { img.src = src; img.classList.remove('hidden'); fallback.classList.add('hidden'); }
+  else { img.removeAttribute('src'); img.classList.add('hidden'); fallback.classList.remove('hidden'); }
+  img.onerror = () => { img.classList.add('hidden'); fallback.classList.remove('hidden'); };
 
+  document.getElementById('wish-detail-tag').innerHTML = `${icon(meta.icon, 'ic-sm')}${meta.long}`;
+  document.getElementById('wish-detail-title').textContent = w.title || '';
+  const date = shortDate(w.createdAt);
+  document.getElementById('wish-detail-meta').textContent = `${requester?.name || '?'} 담음${date ? ' · ' + date : ''}`;
+  const notesWrap = document.getElementById('wish-detail-notes-wrap');
+  notesWrap.classList.toggle('hidden', !w.notes);
+  document.getElementById('wish-detail-notes').textContent = w.notes || '';
   const linkEl = document.getElementById('wish-detail-link');
-  if (w.link) {
-    linkEl.href = w.link;
-    linkEl.classList.remove('hidden');
-  } else {
-    linkEl.classList.add('hidden');
-  }
+  linkEl.classList.toggle('hidden', !w.link);
+  if (w.link) { linkEl.href = w.link; document.getElementById('wish-detail-link-host').textContent = linkHost(w.link); }
+  document.getElementById('btn-wish-detail-heart').innerHTML = w.done
+    ? `${icon('undo')}다시 찜하기`
+    : `${icon('check')}${meta.done}`;
 
-  const heartBtn = document.getElementById('btn-wish-detail-heart');
-  heartBtn.textContent = w.done ? '🤍 다시 담기' : '💖 이뤄졌어요로 표시';
-
+  showWishViewMode(true);
   wishModal.classList.remove('hidden');
 }
 function closeWishModal() { wishModal.classList.add('hidden'); editingWishId = null; }
 document.getElementById('modal-wish-close').addEventListener('click', closeWishModal);
 wishModal.addEventListener('click', (e) => { if (e.target === wishModal) closeWishModal(); });
+
 document.getElementById('btn-wish-detail-heart').addEventListener('click', async () => {
   const w = state.wishes[editingWishId];
-  if (w) await toggleWishDone(w);
+  if (!w) return;
+  const meta = WISH_CAT_META[catOf(w)];
+  await toggleWishDone(w);
   closeWishModal();
+  toast(w.done ? '다시 찜했어요' : `"${w.title}" ${meta.done}`);
 });
 document.getElementById('btn-delete-wish').addEventListener('click', async () => {
   if (!editingWishId) return;
-  if (confirm('이 위시를 삭제할까요?')) {
-    await db.collection('families').doc(state.familyId).collection('wishes').doc(editingWishId).delete();
+  if (confirm('이 찜을 삭제할까요?')) {
+    await wishColl().doc(editingWishId).delete();
     closeWishModal();
   }
 });
+document.getElementById('btn-edit-wish').addEventListener('click', () => {
+  const w = state.wishes[editingWishId];
+  if (!w) return;
+  editingWishCat = catOf(w);
+  document.getElementById('wish-detail-title-input').value = w.title || '';
+  paintPicker('wish-detail-cat-picker', editingWishCat);
+  const notes = document.getElementById('wish-detail-notes-input');
+  notes.value = w.notes || '';
+  notes.placeholder = WISH_CAT_META[editingWishCat].hint;
+  document.getElementById('wish-detail-link-input').value = w.link || '';
+  photoSlots.edit.data = w.photo || null;
+  renderPhotoSlot('edit');
+  showWishViewMode(false);
+});
+document.getElementById('btn-edit-cancel').addEventListener('click', () => showWishViewMode(true));
 
 document.getElementById('form-wish-edit').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!editingWishId) return;
   const title = document.getElementById('wish-detail-title-input').value.trim();
   if (!title) return;
-  const notes = document.getElementById('wish-detail-notes-input').value.trim() || null;
-  let link = document.getElementById('wish-detail-link-input').value.trim() || null;
-  if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
   try {
-    await db.collection('families').doc(state.familyId).collection('wishes').doc(editingWishId).update({
-      title, category: editingWishCat, notes, link,
+    await wishColl().doc(editingWishId).update({
+      title, category: editingWishCat,
+      notes: document.getElementById('wish-detail-notes-input').value.trim() || null,
+      link: normalizeLink(document.getElementById('wish-detail-link-input').value),
+      photo: photoSlots.edit.data || null,
     });
     toast('수정했어요');
     closeWishModal();
@@ -878,190 +1097,6 @@ document.getElementById('form-wish-edit').addEventListener('submit', async (e) =
     toast('수정 실패: ' + (err.code || err.message));
   }
 });
-
-document.getElementById('form-wish-add').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const input = document.getElementById('wish-title');
-  const notesInput = document.getElementById('wish-notes');
-  const linkInput = document.getElementById('wish-link');
-  const title = input.value.trim();
-  if (!title) return;
-  const category = selectedWishCat;
-  const notes = notesInput?.value.trim() || null;
-  let link = linkInput?.value.trim() || null;
-  if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
-  try {
-    await db.collection('families').doc(state.familyId).collection('wishes').add({
-      title, category, notes, link, done: false,
-      requestedBy: state.memberId, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    input.value = '';
-    if (notesInput) notesInput.value = '';
-    if (linkInput) linkInput.value = '';
-    // category stays as-is (sticky) — adding several items of the same kind in a row shouldn't
-    // require re-tapping the category every time
-    toast(`"${title}" 담았어요 🔖`);
-  } catch (err) {
-    if (err.code === 'permission-denied') toast('위시리스트 권한 설정이 필요해요 (규칙 재게시)');
-    else toast('추가 실패: ' + (err.code || err.message));
-  }
-});
-
-/* ===================== Family notice board ===================== */
-const REACTIONS = ['확인했어요!', '감사해요', '넵!', '👍', '💗', '😂'];
-
-document.getElementById('form-notice-add').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const ta = document.getElementById('notice-text');
-  const text = ta.value.trim();
-  if (!text) return;
-  const pinned = document.getElementById('notice-pin').checked;
-  try {
-    await db.collection('families').doc(state.familyId).collection('notices').add({
-      text, pinned, reactions: {}, readBy: [state.memberId],
-      createdBy: state.memberId, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    ta.value = '';
-    document.getElementById('notice-pin').checked = false;
-  } catch (err) {
-    if (err.code === 'permission-denied') toast('공지 권한 설정이 필요해요 (규칙 재게시)');
-    else toast('올리기 실패: ' + (err.code || err.message));
-  }
-});
-
-function noticeRef(id) {
-  return db.collection('families').doc(state.familyId).collection('notices').doc(id);
-}
-async function toggleReaction(id, label) {
-  const n = state.notices[id]; if (!n) return;
-  const field = 'reactions.' + state.memberId;
-  const mine = (n.reactions || {})[state.memberId];
-  await noticeRef(id).update({ [field]: mine === label ? firebase.firestore.FieldValue.delete() : label });
-}
-async function toggleNoticePin(id) {
-  const n = state.notices[id]; if (!n) return;
-  await noticeRef(id).update({ pinned: !n.pinned });
-}
-async function nudgeNotice(id) {
-  await noticeRef(id).update({ nudge: { by: state.memberId, at: firebase.firestore.FieldValue.serverTimestamp() } });
-  toast('안 읽은 가족에게 콕 알림을 보냈어요');
-}
-async function deleteNotice(id) {
-  if (!confirm('이 공지를 삭제할까요?')) return;
-  await noticeRef(id).delete();
-}
-function convertNoticeToTask(id) {
-  const n = state.notices[id]; if (!n) return;
-  closeNoticeModal();
-  showTab('request');
-  applyGoodsView('tasks');
-  openTaskModal(null);
-  document.getElementById('task-title').value = (n.text || '').slice(0, 60);
-}
-function markNoticesReadIfVisible() {
-  const modal = document.getElementById('modal-notice');
-  if (modal && !modal.classList.contains('hidden')) markNoticesRead();
-}
-function markNoticesRead() {
-  if (!state.memberId) return;
-  Object.values(state.notices).forEach(n => {
-    if (!n.readBy || !n.readBy.includes(state.memberId)) {
-      noticeRef(n.id).update({ readBy: firebase.firestore.FieldValue.arrayUnion(state.memberId) }).catch(() => {});
-    }
-  });
-}
-
-function renderNotices() {
-  const list = document.getElementById('notice-list');
-  if (!list) return;
-  list.innerHTML = '';
-  const items = Object.values(state.notices).sort((a, b) => {
-    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-    return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
-  });
-  if (items.length === 0) {
-    list.innerHTML = '<p class="empty-state">아직 공지가 없어요. 가족에게 한마디 남겨보세요 💌</p>';
-    return;
-  }
-  const memberCount = Object.keys(state.members).length || 1;
-  items.forEach(n => {
-    const author = state.members[n.createdBy]?.name || '?';
-    const mine = (n.reactions || {})[state.memberId];
-    const reactionEntries = Object.entries(n.reactions || {});
-    const readBy = n.readBy || [];
-    const isAuthor = n.createdBy === state.memberId;
-    const unread = memberCount - readBy.length;
-
-    const summary = reactionEntries.map(([uid, label]) =>
-      `<span class="reaction-chip">${escapeHtml(label)} <b>${escapeHtml(state.members[uid]?.name || '?')}</b></span>`
-    ).join('');
-    const readAvatars = readBy.map(uid => {
-      const m = state.members[uid]; if (!m) return '';
-      return `<span class="avatar-dot mini" style="background:${colorFor(m.colorIndex)}">${initialsFor(m.name)}</span>`;
-    }).join('');
-
-    const card = document.createElement('div');
-    card.className = 'notice-card' + (n.pinned ? ' pinned' : '');
-    card.innerHTML = `
-      ${n.pinned ? '<span class="pin-badge">📌 고정</span>' : ''}
-      <p class="notice-text">${escapeHtml(n.text).replace(/\n/g, '<br>')}</p>
-      <div class="notice-byline">
-        <span class="avatar-dot" style="background:${colorForAssignee(n.createdBy)}">${initialsFor(author)}</span>
-        <span>${escapeHtml(author)}</span>
-        <span class="notice-time">${n.createdAt ? formatRelativeTime(n.createdAt) : ''}</span>
-      </div>
-      <div class="reaction-bar">
-        ${REACTIONS.map(r => `<button class="react-btn ${mine === r ? 'on' : ''}" data-r="${escapeHtml(r)}">${escapeHtml(r)}</button>`).join('')}
-      </div>
-      ${summary ? `<div class="reaction-summary">${summary}</div>` : ''}
-      <div class="notice-foot">
-        <span class="read-info">👀 ${readBy.length}/${memberCount} ${readAvatars}</span>
-        <span class="notice-actions">
-          <button class="notice-mini todo">집안일로</button>
-          ${unread > 0 ? '<button class="notice-mini nudge">콕 찌르기</button>' : ''}
-          ${isAuthor ? `<button class="notice-mini pin">${n.pinned ? '고정해제' : '고정'}</button>` : ''}
-          ${isAuthor ? '<button class="notice-mini del">삭제</button>' : ''}
-        </span>
-      </div>
-    `;
-    card.querySelectorAll('.react-btn').forEach(b => b.addEventListener('click', () => toggleReaction(n.id, b.dataset.r)));
-    card.querySelector('.todo')?.addEventListener('click', () => convertNoticeToTask(n.id));
-    card.querySelector('.nudge')?.addEventListener('click', () => nudgeNotice(n.id));
-    card.querySelector('.pin')?.addEventListener('click', () => toggleNoticePin(n.id));
-    card.querySelector('.del')?.addEventListener('click', () => deleteNotice(n.id));
-    list.appendChild(card);
-  });
-}
-
-/* Mini banner shown above every tab: top pinned notice, else latest; opens the full board */
-function renderNoticeBanner() {
-  const banner = document.getElementById('notice-banner');
-  if (!banner) return;
-  const items = Object.values(state.notices).sort((a, b) => {
-    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-    return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
-  });
-  if (items.length === 0) {
-    document.getElementById('notice-banner-text').textContent = '가족에게 한마디를 남겨보세요 💌';
-    banner.classList.remove('hidden');
-    return;
-  }
-  const top = items[0];
-  const author = state.members[top.createdBy]?.name || '?';
-  document.getElementById('notice-banner-text').textContent =
-    (top.pinned ? '📌 ' : '') + `${author}: ${top.text}`;
-  banner.classList.remove('hidden');
-}
-
-const noticeModal = document.getElementById('modal-notice');
-function openNoticeModal() {
-  noticeModal.classList.remove('hidden');
-  markNoticesRead();
-}
-function closeNoticeModal() { noticeModal.classList.add('hidden'); }
-document.getElementById('notice-banner').addEventListener('click', openNoticeModal);
-document.getElementById('modal-notice-close').addEventListener('click', closeNoticeModal);
-noticeModal.addEventListener('click', (e) => { if (e.target === noticeModal) closeNoticeModal(); });
 
 /* ===================== Anniversaries ===================== */
 function populateMonthDaySelects() {
@@ -1104,7 +1139,7 @@ function renderAnniversaries() {
     const next = nextOccurrence(a.month, a.day);
     const daysLeft = Math.ceil((next - new Date(new Date().toDateString())) / 86400000);
     row.innerHTML = `
-      <span class="anniversary-icon">${a.type === 'birthday' ? '🎂' : '🎉'}</span>
+      <span class="anniversary-icon">${a.type === 'birthday' ? '생일' : '기념일'}</span>
       <span class="anniversary-name">${escapeHtml(a.title)}</span>
       <span class="anniversary-date">${a.month}월 ${a.day}일</span>
       ${daysLeft <= 14 ? `<span class="anniversary-badge">${daysLeft === 0 ? '오늘' : 'D-' + daysLeft}</span>` : ''}
@@ -1177,7 +1212,7 @@ function checkUpcomingAnniversaries() {
   todayItems.forEach(a => {
     const next = nextOccurrence(a.month, a.day);
     const daysLeft = Math.ceil((next - new Date(new Date().toDateString())) / 86400000);
-    if (daysLeft === 0) notifyUser(`오늘은 ${a.title}${a.type === 'birthday' ? ' 생일' : ''}이에요 🎉`);
+    if (daysLeft === 0) notifyUser(`오늘은 ${a.title}${a.type === 'birthday' ? ' 생일' : ''}이에요`);
     else notifyUser(`${a.title}이(가) 3일 뒤예요`, `${a.month}월 ${a.day}일`);
   });
   state.notifiedAnniversaryToday = key;
@@ -1256,7 +1291,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('appinstalled', () => {
     localStorage.setItem('installBannerDismissed', '1');
     hide();
-    toast('앱이 설치됐어요 🎉');
+    toast('앱이 설치됐어요');
   });
 
   // iOS Safari has no beforeinstallprompt — show manual instructions instead
