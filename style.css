@@ -381,3 +381,33 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 .fab-wish[data-mode="gift"]  { --c: var(--lime); }
 .fab-wish.hidden { display: none; }
 @media (prefers-reduced-motion: reduce) { .fab-wish { transition: none; } }
+
+/* ===== 모션 ===== */
+/* 칸을 고르면 네온 간판이 켜지듯 깜빡이며 점등 */
+@keyframes power-on {
+  0% { filter: brightness(.6); } 10% { filter: brightness(1.55); } 18% { filter: brightness(.7); }
+  30% { filter: brightness(1.35); } 42% { filter: brightness(.9); } 100% { filter: brightness(1); }
+}
+.cat-tile.on { animation: power-on .6s linear; }
+/* 숫자가 바뀌면 톡 */
+@keyframes bump { 0% { transform: scale(1); } 35% { transform: scale(1.35); filter: brightness(1.6); } 100% { transform: scale(1); filter: none; } }
+.bump { animation: bump .45s var(--ease-out); }
+.status-chip-count, .seg .num { display: inline-block; }
+.cat-tile-count { transform-origin: left center; }
+/* 목록 줄이 차례로 올라옴 */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.stagger > * { animation: rise .38s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 32ms); }
+/* 체크하면 옆으로 밀려나며 접힌다 */
+@keyframes leave {
+  0% { opacity: 1; transform: none; max-height: 220px; }
+  45% { opacity: 0; transform: translateX(30px); max-height: 220px; }
+  100% { opacity: 0; transform: translateX(30px); max-height: 0; padding-top: 0; padding-bottom: 0; margin: 0; border-width: 0; }
+}
+.leaving { animation: leave .38s var(--ease-out) forwards; overflow: hidden; pointer-events: none; }
+/* 오른쪽 아래 버튼이 종류를 바꿀 때 팝 */
+@keyframes pop { 0% { transform: scale(.88); } 55% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.fab-wish.pop { animation: pop .38s var(--ease-out); }
+/* 화면·시트 전환 */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+[id^="goods-view-"]:not(.hidden) { animation: fade-in .28s var(--ease-out); }
+.modal-overlay:not(.hidden) { animation: fade-in .2s ease-out; }

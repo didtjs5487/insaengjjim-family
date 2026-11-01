@@ -100,6 +100,28 @@ function toast(msg) {
   setTimeout(() => el.remove(), 3200);
 }
 
+/* ---- 모션 도우미 ---- */
+function restartAnim(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+// 화면·칸·종류를 바꿨을 때 목록 줄이 위에서부터 차례로 올라온다
+function staggerList(list) {
+  if (!list) return;
+  [...list.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 9)));
+  restartAnim(list, 'stagger');
+  clearTimeout(list._stg);
+  list._stg = setTimeout(() => list.classList.remove('stagger'), 900);
+}
+// 숫자가 바뀌면 톡 튄다
+const bumpObserver = new MutationObserver(muts => muts.forEach(m => {
+  const el = m.target;
+  const v = el.textContent;
+  if (el.dataset.prev !== undefined && el.dataset.prev !== v) restartAnim(el, 'bump');
+  el.dataset.prev = v;
+}));
+document.querySelectorAll('.cat-tile-count, .status-chip-count, .seg .num').forEach(el => {
+  el.dataset.prev = el.textContent;
+  bumpObserver.observe(el, { childList: true });
+});
+
 /* ===================== Entry (name + shared password, no signup) ===================== */
 let pendingEntry = null; // { name, password } — set when offering to create a new family
 
@@ -437,7 +459,8 @@ function buildTaskCard(t) {
     e.currentTarget.classList.add('checked');
     e.currentTarget.innerHTML = icon('check', 'ic-sm');
     card.classList.add('done');
-    setTimeout(() => { toggleTaskDone(t); toast('보관함으로 보냈어요'); }, 350);
+    setTimeout(() => card.classList.add('leaving'), 220);
+    setTimeout(() => { toggleTaskDone(t); toast('보관함으로 보냈어요'); }, 560);
   });
   card.querySelector('.task-body').addEventListener('click', () => openTaskModal(t));
   return card;
@@ -549,6 +572,10 @@ function applyGoodsView(view) {
   GOODS_VIEWS.forEach(v => document.getElementById(`goods-view-${v}`).classList.toggle('hidden', v !== view));
   document.querySelectorAll('.status-chip').forEach(b => b.classList.toggle('active', b.dataset.goodsView === view));
   document.getElementById('btn-archive').classList.toggle('active', view === 'archive');
+  if (applyGoodsView.last !== view) {
+    applyGoodsView.last = view;
+    staggerList(document.getElementById({ wish: 'wish-list', tasks: 'tasks-list', shopping: 'shopping-list', archive: 'archive-list' }[view]));
+  }
 }
 document.getElementById('btn-archive').addEventListener('click', () => {
   showTab('request');
@@ -617,14 +644,15 @@ function renderArchive() {
       ${it.remove ? `<button type="button" class="arch-del" aria-label="완전히 지우기">${icon('x', 'ic-sm')}</button>` : ''}`;
     const main = row.querySelector('.arch-main');
     if (it.open) main.addEventListener('click', it.open); else main.disabled = true;
-    row.querySelector('.arch-restore').addEventListener('click', it.restore);
+    const leaveThen = (fn) => () => { row.classList.add('leaving'); setTimeout(fn, 340); };
+    row.querySelector('.arch-restore').addEventListener('click', leaveThen(it.restore));
     const del = row.querySelector('.arch-del');
-    if (del) del.addEventListener('click', it.remove);
+    if (del) del.addEventListener('click', leaveThen(it.remove));
     list.appendChild(row);
   });
 }
 document.querySelectorAll('#archive-seg button').forEach(btn => {
-  btn.addEventListener('click', () => { archiveUi.kind = btn.dataset.akind; renderArchive(); });
+  btn.addEventListener('click', () => { archiveUi.kind = btn.dataset.akind; renderArchive(); staggerList(document.getElementById('archive-list')); });
 });
 
 /* ===================== Shopping / household supplies ===================== */
@@ -654,11 +682,12 @@ function renderShopping() {
       e.currentTarget.classList.add('checked');
       e.currentTarget.innerHTML = icon('check', 'ic-sm');
       row.classList.add('purchased');
+      setTimeout(() => row.classList.add('leaving'), 220);
       setTimeout(() => {
         db.collection('families').doc(state.familyId).collection('shopping').doc(item.id).update({
           purchased: true, purchasedBy: state.memberId, purchasedAt: firebase.firestore.FieldValue.serverTimestamp(),
         });
-      }, 350);
+      }, 560);
     });
     list.appendChild(row);
   });
@@ -871,7 +900,9 @@ document.getElementById('fab-wish').addEventListener('click', () => {
 function syncWishFab() {
   const f = state.wishFilter;
   const fab = document.getElementById('fab-wish');
+  const changed = fab.dataset.mode !== f;
   fab.dataset.mode = f;
+  if (changed) restartAnim(fab, 'pop');
   const label = f === 'all' ? '찜 추가' : WISH_CAT_META[f].label + ' 추가';
   document.getElementById('fab-wish-label').textContent = label;
   fab.setAttribute('aria-label', f === 'all' ? '찜 추가' : WISH_CAT_META[f].label + ' 찜 추가');
@@ -1049,10 +1080,11 @@ document.querySelectorAll('.cat-tile').forEach(tile => {
   tile.addEventListener('click', () => {
     state.wishFilter = state.wishFilter === tile.dataset.cat ? 'all' : tile.dataset.cat;
     renderWishes();
+    staggerList(document.getElementById('wish-list'));
   });
 });
 document.querySelectorAll('#wish-state-seg button').forEach(btn => {
-  btn.addEventListener('click', () => { wishUi.state = btn.dataset.wstate; renderWishes(); });
+  btn.addEventListener('click', () => { wishUi.state = btn.dataset.wstate; renderWishes(); staggerList(document.getElementById('wish-list')); });
 });
 document.getElementById('wish-search').addEventListener('input', (e) => {
   wishUi.query = e.target.value.trim().toLowerCase();
