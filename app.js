@@ -255,6 +255,11 @@ function enterFamily(familyId) {
   state.unsubFamily = db.collection('families').doc(familyId).onSnapshot(snap => {
     if (!snap.exists) return;
     state.familyDoc = snap.data();
+    // 앱 이름이 '우리집'이던 시절에 만든 데이터는 이름을 한 번만 '인생찜'으로 고친다
+    if (state.familyDoc.name === '우리집') {
+      state.familyDoc.name = '인생찜';
+      db.collection('families').doc(familyId).update({ name: '인생찜' }).catch(() => {});
+    }
     document.getElementById('family-name-label').textContent = state.familyDoc.name || '인생찜';
     document.getElementById('invite-code-display').textContent = state.familyDoc.sharedPassword || state.familyDoc.inviteCode || '';
   });
