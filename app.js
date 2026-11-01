@@ -931,6 +931,109 @@ document.getElementById('form-wish-add').addEventListener('submit', async (e) =>
   }
 });
 
+/* ---- 목록 가져오기: 붙여넣은 여러 줄을 한 번에 찜으로 ---- */
+const IMPORT_HEADERS = [
+  ['title', /^(이름|제목|품명|상품명|제품명|물건|품목|항목)$/],
+  ['detail', /^(세부|세부분류|분류|종류|카테고리|상세|메모|비고|설명)$/],
+  ['link', /^(링크|url|주소|사이트)$/i],
+  ['price', /^(가격|금액|단가)$/],
+  ['done', /^(구입|구매|완료|상태|구입여부|구매여부)$/],
+];
+const IMPORT_DONE = /^(완료|구입|구매|샀|샀음|샀어요|구입함|구매함|구입완료|구매완료|구입 완료|구매 완료|o|v|y|yes|true|✓|✔)$/i;
+const importPriceLabel = (v) => {
+  const m = v.replace(/\s/g, '').match(/^₩?([\d,]+)원?$/);
+  if (!m) return null;
+  const digits = m[1].replace(/,/g, '');
+  if (!/원/.test(v) && digits.length < 4) return null;
+  return Number(digits).toLocaleString('ko-KR') + '원';
+};
+function parseImportText(text, cat) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const split = (l) => (l.includes('\t') ? l.split('\t') : l.includes('|') ? l.split('|') : [l]).map(s => s.trim());
+  let map = null;
+  const first = split(lines[0]);
+  const hdr = first.map(cell => (IMPORT_HEADERS.find(([, re]) => re.test(cell.replace(/\s/g, ''))) || [])[0]);
+  if (first.length > 1 && hdr.filter(Boolean).length >= 2 && hdr.includes('title')) { map = hdr; lines.shift(); }
+  const existing = new Set(Object.values(state.wishes).filter(w => catOf(w) === cat).map(w => w.title.trim().toLowerCase()));
+  const seen = new Set();
+  const items = [];
+  lines.forEach(line => {
+    const cells = split(line);
+    let title = '', link = null, price = null, done = false;
+    const details = [];
+    if (cells.length === 1) {
+      const url = cells[0].match(/https?:\/\/\S+/);
+      if (url) link = url[0];
+      title = cells[0].replace(/https?:\/\/\S+/g, '').trim();
+    } else {
+      cells.forEach((cell, idx) => {
+        if (!cell) return;
+        const role = map ? map[idx] : (idx === 0 ? 'title' : null);
+        if (role === 'title') title = cell;
+        else if (role === 'link' || (!role && /^https?:\/\//i.test(cell))) link = normalizeLink(cell);
+        else if (role === 'price' || (!role && importPriceLabel(cell))) price = importPriceLabel(cell) || cell;
+        else if (role === 'done' || (!role && IMPORT_DONE.test(cell))) done = done || IMPORT_DONE.test(cell);
+        else details.push(cell);
+      });
+    }
+    if (!title) return;
+    const key = title.toLowerCase();
+    const dup = existing.has(key) || seen.has(key);
+    seen.add(key);
+    const notes = [details.join(' · '), price ? '가격 ' + price : ''].filter(Boolean).join(' · ') || null;
+    items.push({ title, notes, link, done, dup });
+  });
+  return items;
+}
+function refreshImportSummary() {
+  const items = parseImportText(document.getElementById('import-text').value, document.getElementById('import-cat').value);
+  const fresh = items.filter(i => !i.dup);
+  const sum = document.getElementById('import-summary');
+  const btn = document.getElementById('btn-import');
+  if (!items.length) { sum.textContent = '붙여넣으면 몇 개인지 보여드려요.'; btn.disabled = true; btn.textContent = '가져오기'; return fresh; }
+  const done = fresh.filter(i => i.done).length;
+  sum.textContent = `${fresh.length}개를 넣어요${done ? ` (구입 표시 ${done}개는 보관함으로)` : ''}${items.length - fresh.length ? ` · 이미 있는 ${items.length - fresh.length}개는 건너뛰어요` : ''}`;
+  btn.disabled = fresh.length === 0;
+  btn.textContent = fresh.length ? `${fresh.length}개 가져오기` : '가져오기';
+  return fresh;
+}
+document.getElementById('import-text').addEventListener('input', refreshImportSummary);
+document.getElementById('import-cat').addEventListener('change', refreshImportSummary);
+document.getElementById('btn-import').addEventListener('click', async (e) => {
+  const fresh = refreshImportSummary();
+  if (!fresh.length) return;
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  const cat = document.getElementById('import-cat').value;
+  try {
+    const now = Date.now();
+    for (let start = 0; start < fresh.length; start += 400) {
+      const batch = db.batch();
+      fresh.slice(start, start + 400).forEach((it, k) => {
+        const stamp = firebase.firestore.Timestamp.fromMillis(now - (start + k) * 1000);
+        batch.set(wishColl().doc(), {
+          title: it.title, category: cat, notes: it.notes, link: it.link, photo: null,
+          done: it.done, doneBy: it.done ? state.memberId : null, doneAt: it.done ? stamp : null,
+          requestedBy: state.memberId, createdAt: stamp,
+        });
+      });
+      await batch.commit();
+    }
+    document.getElementById('import-text').value = '';
+    refreshImportSummary();
+    state.wishFilter = 'all'; wishUi.state = 'open'; wishUi.query = '';
+    document.getElementById('wish-search').value = '';
+    toast(`${fresh.length}개 넣었어요`);
+    showTab('request');
+    applyGoodsView('wish');
+    renderWishes();
+  } catch (err) {
+    toast('가져오기 실패: ' + (err.code || err.message));
+    refreshImportSummary();
+  }
+});
+
 /* ---- list: tiles filter, search, 남은 것 / 다녀옴 ---- */
 document.querySelectorAll('.cat-tile').forEach(tile => {
   tile.addEventListener('click', () => {

@@ -362,3 +362,9 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 .arch-del { flex: none; width: 40px; height: 40px; background: none; border: 0; color: var(--muted); border-radius: 10px; cursor: pointer; display: grid; place-items: center; }
 .arch-del:active { color: var(--danger); }
 .icon-btn.active { color: var(--text); border-color: var(--text); }
+
+/* ===== 목록 가져오기 ===== */
+.import-box { display: flex; flex-direction: column; gap: 10px; }
+.import-box textarea { min-height: 120px; resize: vertical; font-size: 16px; line-height: 1.5; }
+.import-box .hint-text { margin: 0; }
+.import-box .btn { align-self: flex-start; }
