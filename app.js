@@ -996,8 +996,10 @@ const IMPORT_HEADERS = [
   ['link', /^(링크|url|주소|사이트)$/i],
   ['price', /^(가격|금액|단가)$/],
   ['done', /^(구입|구매|완료|상태|구입여부|구매여부)$/],
+  ['photo', /^(이미지|사진|그림|image|img)$/i],
 ];
 const IMPORT_DONE = /^(완료|구입|구매|샀|샀음|샀어요|구입함|구매함|구입완료|구매완료|구입 완료|구매 완료|o|v|y|yes|true|✓|✔)$/i;
+const IMPORT_IMG = /^https?:\/\/\S+\.(jpe?g|png|webp|gif|avif)(\?\S*)?$/i;
 const importPriceLabel = (v) => {
   const m = v.replace(/\s/g, '').match(/^₩?([\d,]+)원?$/);
   if (!m) return null;
@@ -1018,7 +1020,7 @@ function parseImportText(text, cat) {
   const items = [];
   lines.forEach(line => {
     const cells = split(line);
-    let title = '', link = null, price = null, done = false;
+    let title = '', link = null, price = null, done = false, photo = null;
     const details = [];
     if (cells.length === 1) {
       const url = cells[0].match(/https?:\/\/\S+/);
@@ -1029,6 +1031,7 @@ function parseImportText(text, cat) {
         if (!cell) return;
         const role = map ? map[idx] : (idx === 0 ? 'title' : null);
         if (role === 'title') title = cell;
+        else if (role === 'photo' || (!role && IMPORT_IMG.test(cell))) { if (/^https?:/i.test(cell)) photo = cell; }
         else if (role === 'link' || (!role && /^https?:\/\//i.test(cell))) link = normalizeLink(cell);
         else if (role === 'price' || (!role && importPriceLabel(cell))) price = importPriceLabel(cell) || cell;
         else if (role === 'done' || (!role && IMPORT_DONE.test(cell))) done = done || IMPORT_DONE.test(cell);
@@ -1040,7 +1043,7 @@ function parseImportText(text, cat) {
     const dup = existing.has(key) || seen.has(key);
     seen.add(key);
     const notes = [details.join(' · '), price ? '가격 ' + price : ''].filter(Boolean).join(' · ') || null;
-    items.push({ title, notes, link, done, dup });
+    items.push({ title, notes, link, photo, done, dup });
   });
   return items;
 }
@@ -1051,7 +1054,8 @@ function refreshImportSummary() {
   const btn = document.getElementById('btn-import');
   if (!items.length) { sum.textContent = '붙여넣으면 몇 개인지 보여드려요.'; btn.disabled = true; btn.textContent = '가져오기'; return fresh; }
   const done = fresh.filter(i => i.done).length;
-  sum.textContent = `${fresh.length}개를 넣어요${done ? ` (구입 표시 ${done}개는 보관함으로)` : ''}${items.length - fresh.length ? ` · 이미 있는 ${items.length - fresh.length}개는 건너뛰어요` : ''}`;
+  const pics = fresh.filter(i => i.photo).length;
+  sum.textContent = `${fresh.length}개를 넣어요${done ? ` (구입 표시 ${done}개는 보관함으로)` : ''}${pics ? ` · 사진 ${pics}개` : ''}${items.length - fresh.length ? ` · 이미 있는 ${items.length - fresh.length}개는 건너뛰어요` : ''}`;
   btn.disabled = fresh.length === 0;
   btn.textContent = fresh.length ? `${fresh.length}개 가져오기` : '가져오기';
   return fresh;
@@ -1071,7 +1075,7 @@ document.getElementById('btn-import').addEventListener('click', async (e) => {
       fresh.slice(start, start + 400).forEach((it, k) => {
         const stamp = firebase.firestore.Timestamp.fromMillis(now - (start + k) * 1000);
         batch.set(wishColl().doc(), {
-          title: it.title, category: cat, notes: it.notes, link: it.link, photo: null,
+          title: it.title, category: cat, notes: it.notes, link: it.link, photo: it.photo || null,
           done: it.done, doneBy: it.done ? state.memberId : null, doneAt: it.done ? stamp : null,
           requestedBy: state.memberId, createdAt: stamp,
         });
