@@ -413,8 +413,8 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 .modal-overlay:not(.hidden) { animation: fade-in .2s ease-out; }
 
 /* ===== 네온 간판 글자: 흰 심지 + 분홍 빛, 가끔 '생' 한 글자만 깜빡 ===== */
-.tube { --glow: #ff2e88; color: #fff2f8;
-  text-shadow: 0 0 1px #fff, 0 0 4px #ffd0e6, 0 0 9px var(--glow), 0 0 20px var(--glow), 0 0 42px var(--glow), 0 0 80px color-mix(in srgb, var(--glow) 55%, transparent); }
+.tube { --glow: #ff2e88; color: #fff6fa;
+  text-shadow: 0 0 1px #fff, 0 0 3px color-mix(in srgb, var(--glow) 85%, transparent), 0 0 9px color-mix(in srgb, var(--glow) 45%, transparent); }
 .tube > span { display: inline-block; }
 @keyframes tube-flicker {
   0%, 17%, 21%, 55%, 58%, 100% { opacity: 1; text-shadow: inherit; }
