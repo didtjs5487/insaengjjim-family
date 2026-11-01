@@ -995,7 +995,8 @@ const IMPORT_HEADERS = [
   ['detail', /^(세부|세부분류|분류|종류|카테고리|상세|메모|비고|설명)$/],
   ['link', /^(링크|url|주소|사이트)$/i],
   ['price', /^(가격|금액|단가)$/],
-  ['done', /^(구입|구매|완료|상태|구입여부|구매여부)$/],
+  ['status', /^상태$/],
+  ['done', /^(구입|구매|완료|구입여부|구매여부)$/],
   ['photo', /^(이미지|사진|그림|image|img)$/i],
 ];
 const IMPORT_DONE = /^(완료|구입|구매|샀|샀음|샀어요|구입함|구매함|구입완료|구매완료|구입 완료|구매 완료|o|v|y|yes|true|✓|✔)$/i;
@@ -1031,9 +1032,10 @@ function parseImportText(text, cat) {
         if (!cell) return;
         const role = map ? map[idx] : (idx === 0 ? 'title' : null);
         if (role === 'title') title = cell;
+        else if (role === 'status') { if (IMPORT_DONE.test(cell)) done = true; else details.push(cell); }
         else if (role === 'photo' || (!role && IMPORT_IMG.test(cell))) { if (/^https?:/i.test(cell)) photo = cell; }
         else if (role === 'link' || (!role && /^https?:\/\//i.test(cell))) link = normalizeLink(cell);
-        else if (role === 'price' || (!role && importPriceLabel(cell))) price = importPriceLabel(cell) || cell;
+        else if (role === 'price' || (!role && importPriceLabel(cell))) { const lab = importPriceLabel(cell); if (lab) price = lab; else if (!/미확인|^-$/.test(cell)) price = cell; }
         else if (role === 'done' || (!role && IMPORT_DONE.test(cell))) done = done || IMPORT_DONE.test(cell);
         else details.push(cell);
       });
@@ -1060,6 +1062,12 @@ function refreshImportSummary() {
   btn.textContent = fresh.length ? `${fresh.length}개 가져오기` : '가져오기';
   return fresh;
 }
+document.getElementById('btn-import-paste').addEventListener('click', async () => {
+  try {
+    document.getElementById('import-text').value = await navigator.clipboard.readText();
+    refreshImportSummary();
+  } catch (e) { toast('칸을 길게 눌러 붙여넣기 해주세요'); }
+});
 document.getElementById('import-text').addEventListener('input', refreshImportSummary);
 document.getElementById('import-cat').addEventListener('change', refreshImportSummary);
 document.getElementById('btn-import').addEventListener('click', async (e) => {

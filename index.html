@@ -223,6 +223,7 @@
         <option value="food">음식으로 넣기</option>
         <option value="place">장소로 넣기</option>
       </select>
+      <button type="button" id="btn-import-paste" class="btn btn-secondary btn-small"><svg class="ic ic-sm"><use href="#i-clipboard"/></svg>복사한 목록 붙여넣기</button>
       <textarea id="import-text" rows="6" placeholder="이름 | 세부분류 | 가격 | 링크 | 이미지주소 | 구입(완료면 적기)" spellcheck="false"></textarea>
       <p class="hint-text" id="import-summary">붙여넣으면 몇 개인지 보여드려요.</p>
       <button type="button" id="btn-import" class="btn btn-pin btn-small" disabled>가져오기</button>
@@ -420,6 +421,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=34"></script>
+<script src="app.js?v=35"></script>
 </body>
 </html>
