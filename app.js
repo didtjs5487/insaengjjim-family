@@ -863,9 +863,19 @@ function openWishAdd(prefill = {}) {
   document.getElementById('wish-title').focus();
 }
 function closeWishAdd() { wishAddModal.classList.add('hidden'); }
-document.querySelectorAll('.cat-add').forEach(btn => {
-  btn.addEventListener('click', () => openWishAdd({ cat: btn.dataset.cat }));
+/* 오른쪽 아래 + 버튼: 칸을 고른 상태면 그 종류로 바로, 아무것도 안 골랐으면 종류를 고르며 추가 */
+document.getElementById('fab-wish').addEventListener('click', () => {
+  const f = state.wishFilter;
+  if (f === 'all') openWishAdd({ pick: true }); else openWishAdd({ cat: f });
 });
+function syncWishFab() {
+  const f = state.wishFilter;
+  const fab = document.getElementById('fab-wish');
+  fab.dataset.mode = f;
+  const label = f === 'all' ? '찜 추가' : WISH_CAT_META[f].label + ' 추가';
+  document.getElementById('fab-wish-label').textContent = label;
+  fab.setAttribute('aria-label', f === 'all' ? '찜 추가' : WISH_CAT_META[f].label + ' 찜 추가');
+}
 document.getElementById('modal-wish-add-close').addEventListener('click', closeWishAdd);
 wishAddModal.addEventListener('click', (e) => { if (e.target === wishAddModal) closeWishAdd(); });
 
@@ -1095,6 +1105,7 @@ function renderWishes() {
     t.setAttribute('aria-pressed', on);
   });
   document.getElementById('cat-tiles').classList.toggle('has-on', filter !== 'all');
+  syncWishFab();
 
   const inCat = all.filter(w => filter === 'all' || catOf(w) === filter);
   document.getElementById('seg-open').textContent = inCat.filter(w => !w.done).length;

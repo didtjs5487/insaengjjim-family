@@ -162,10 +162,6 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 .cat-tile-count { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 42px; font-weight: 500; line-height: 0.95; text-shadow: 0 0 14px color-mix(in srgb, var(--c) 70%, transparent); }
 .cat-tile.on { border-color: var(--c); box-shadow: 0 0 28px color-mix(in srgb, var(--c) 55%, transparent), inset 0 0 22px color-mix(in srgb, var(--c) 20%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--c) 30%, transparent), color-mix(in srgb, var(--c) 6%, transparent) 70%); }
 .cat-tiles.has-on .cat-tile:not(.on) { opacity: .45; box-shadow: none; }
-.cat-add { position: absolute; right: 8px; top: 8px; z-index: 2; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; cursor: pointer; color: var(--ground); background: var(--c); border: 0; box-shadow: 0 0 16px color-mix(in srgb, var(--c) 65%, transparent); transition: transform .15s var(--ease-out); }
-.cat-add .ic { width: 22px; height: 22px; stroke-width: 2.8; }
-.cat-add:active { transform: scale(0.88); }
-.cat-tile-name { padding-right: 38px; }
 
 /* ===== Search + list head ===== */
 .search { position: relative; margin-top: 14px; }
@@ -368,3 +364,20 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 .import-box textarea { min-height: 120px; resize: vertical; font-size: 16px; line-height: 1.5; }
 .import-box .hint-text { margin: 0; }
 .import-box .btn { align-self: flex-start; }
+
+/* ===== 오른쪽 아래 추가 버튼: 고른 칸의 색·이름으로 바뀐다 ===== */
+.fab-wish {
+  --c: #eef1ff;
+  position: fixed; right: max(16px, calc(50% - 304px)); bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 30;
+  height: 54px; padding: 0 20px 0 16px; border: 0; border-radius: 99px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; font-weight: 900; font-size: 16px; color: var(--ground); background: var(--c);
+  box-shadow: 0 6px 22px rgba(0,0,0,0.5), 0 0 26px color-mix(in srgb, var(--c) 55%, transparent);
+  transition: background-color .25s var(--ease-out), box-shadow .25s var(--ease-out), transform .15s var(--ease-out);
+}
+.fab-wish .ic { width: 22px; height: 22px; stroke-width: 2.8; }
+.fab-wish:active { transform: scale(0.94); }
+.fab-wish[data-mode="place"] { --c: var(--cyan); }
+.fab-wish[data-mode="food"]  { --c: var(--pink); }
+.fab-wish[data-mode="gift"]  { --c: var(--lime); }
+.fab-wish.hidden { display: none; }
+@media (prefers-reduced-motion: reduce) { .fab-wish { transition: none; } }

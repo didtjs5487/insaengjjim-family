@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gugi&family=JetBrains+Mono:wght@500&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=24">
+<link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
 
@@ -122,27 +122,25 @@
 
     <!-- 위시 -->
     <div id="goods-view-wish">
+      <button type="button" id="fab-wish" class="fab-wish" data-mode="all" aria-label="찜 추가"><svg class="ic"><use href="#i-plus"/></svg><span id="fab-wish-label">찜 추가</span></button>
       <div class="cat-tiles" id="cat-tiles">
         <div class="cat-wrap" data-cat="place">
           <button class="cat-tile" data-cat="place" aria-pressed="false">
             <span class="cat-tile-name"><svg class="ic"><use href="#i-pin"/></svg>장소</span>
             <span class="cat-tile-count" id="tile-count-place">0</span>
           </button>
-          <button type="button" class="cat-add" data-cat="place" aria-label="장소 찜 추가"><svg class="ic"><use href="#i-plus"/></svg></button>
         </div>
         <div class="cat-wrap" data-cat="food">
           <button class="cat-tile" data-cat="food" aria-pressed="false">
             <span class="cat-tile-name"><svg class="ic"><use href="#i-food"/></svg>음식</span>
             <span class="cat-tile-count" id="tile-count-food">0</span>
           </button>
-          <button type="button" class="cat-add" data-cat="food" aria-label="음식 찜 추가"><svg class="ic"><use href="#i-plus"/></svg></button>
         </div>
         <div class="cat-wrap" data-cat="gift">
           <button class="cat-tile" data-cat="gift" aria-pressed="false">
             <span class="cat-tile-name"><svg class="ic"><use href="#i-bag"/></svg>물건</span>
             <span class="cat-tile-count" id="tile-count-gift">0</span>
           </button>
-          <button type="button" class="cat-add" data-cat="gift" aria-label="물건 찜 추가"><svg class="ic"><use href="#i-plus"/></svg></button>
         </div>
       </div>
 
@@ -422,6 +420,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>
