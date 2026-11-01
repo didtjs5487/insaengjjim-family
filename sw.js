@@ -1,4 +1,4 @@
-const CACHE_NAME = 'insaengjjim-v32';
+const CACHE_NAME = 'insaengjjim-v33';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './manifest.json',
   './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'
