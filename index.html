@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gugi&family=JetBrains+Mono:wght@500&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 
@@ -210,12 +210,6 @@
     <p class="block-title" style="margin-top:24px;">구성원</p>
     <div id="member-list" class="member-list"></div>
 
-    <div class="section-header" style="margin-top:28px;">
-      <p class="block-title" style="margin:0;">생일 · 기념일</p>
-      <button id="btn-add-anniversary" class="btn btn-secondary btn-small"><svg class="ic ic-sm"><use href="#i-plus"/></svg>추가</button>
-    </div>
-    <div id="anniversary-list" class="member-list"></div>
-
     <button id="btn-logout" class="btn btn-ghost" style="margin-top:32px;">로그아웃</button>
   </section>
 </div>
@@ -367,43 +361,6 @@
   </div>
 </div>
 
-<!-- ADD ANNIVERSARY SHEET -->
-<div id="modal-anniversary" class="modal-overlay hidden">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3>생일 · 기념일</h3>
-      <button id="modal-anniversary-close" class="icon-btn" aria-label="닫기"><svg class="ic"><use href="#i-x"/></svg></button>
-    </div>
-    <form id="form-anniversary">
-      <label class="field-label" for="anniversary-type">종류</label>
-      <select id="anniversary-type">
-        <option value="birthday">생일</option>
-        <option value="anniversary">기념일</option>
-      </select>
-
-      <label class="field-label" for="anniversary-title">이름 / 제목</label>
-      <input type="text" id="anniversary-title" placeholder="예: 엄마 생일, 결혼기념일" required>
-
-      <div class="time-row">
-        <div>
-          <label class="field-label" for="anniversary-month">월</label>
-          <select id="anniversary-month"></select>
-        </div>
-        <div>
-          <label class="field-label" for="anniversary-day">일</label>
-          <select id="anniversary-day"></select>
-        </div>
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" id="btn-delete-anniversary" class="btn btn-danger hidden">삭제</button>
-        <button type="submit" class="btn btn-primary">저장</button>
-      </div>
-      <p class="form-error" id="anniversary-error"></p>
-    </form>
-  </div>
-</div>
-
 <!-- CHANGE PASSWORD SHEET -->
 <div id="modal-password" class="modal-overlay hidden">
   <div class="modal-card">
@@ -442,6 +399,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

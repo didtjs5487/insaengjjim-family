@@ -67,16 +67,12 @@ const state = {
   shopping: {},          // itemId -> shopping item data
   wishes: {},            // wishId -> wishlist item data
   wishFilter: 'all',
-  anniversaries: {},     // annivId -> anniversary data
   editingTaskId: null,
-  editingAnniversaryId: null,
   unsubUser: null,
   unsubFamily: null,
   unsubMembers: null,
   unsubTasks: null,
   unsubShopping: null,
-  unsubAnniversaries: null,
-  notifiedAnniversaryToday: null,
 };
 
 /* ===================== Screen / tab helpers ===================== */
@@ -253,7 +249,6 @@ function teardownFamilyListeners() {
   if (state.unsubTasks) { state.unsubTasks(); state.unsubTasks = null; }
   if (state.unsubShopping) { state.unsubShopping(); state.unsubShopping = null; }
   if (state.unsubWishes) { state.unsubWishes(); state.unsubWishes = null; }
-  if (state.unsubAnniversaries) { state.unsubAnniversaries(); state.unsubAnniversaries = null; }
 }
 
 function enterFamily(familyId) {
@@ -293,14 +288,6 @@ function enterFamily(familyId) {
       state.wishes = {};
       snap.forEach(doc => { state.wishes[doc.id] = { id: doc.id, ...doc.data() }; });
       renderWishes();
-    });
-
-  state.unsubAnniversaries = db.collection('families').doc(familyId).collection('anniversaries')
-    .onSnapshot(snap => {
-      state.anniversaries = {};
-      snap.forEach(doc => { state.anniversaries[doc.id] = { id: doc.id, ...doc.data() }; });
-      renderAnniversaries();
-      checkUpcomingAnniversaries();
     });
 
   showScreen('screen-app');
@@ -1097,126 +1084,6 @@ document.getElementById('form-wish-edit').addEventListener('submit', async (e) =
     toast('수정 실패: ' + (err.code || err.message));
   }
 });
-
-/* ===================== Anniversaries ===================== */
-function populateMonthDaySelects() {
-  const monthSel = document.getElementById('anniversary-month');
-  const daySel = document.getElementById('anniversary-day');
-  if (monthSel.options.length === 0) {
-    for (let m=1;m<=12;m++) monthSel.innerHTML += `<option value="${m}">${m}월</option>`;
-  }
-  const refreshDays = () => {
-    const days = new Date(2024, parseInt(monthSel.value,10), 0).getDate(); // leap-safe max
-    const prev = daySel.value;
-    daySel.innerHTML = '';
-    for (let d=1; d<=days; d++) daySel.innerHTML += `<option value="${d}">${d}일</option>`;
-    if (prev && parseInt(prev,10) <= days) daySel.value = prev;
-  };
-  monthSel.onchange = refreshDays;
-  refreshDays();
-}
-
-function nextOccurrence(month, day) {
-  const now = new Date();
-  let year = now.getFullYear();
-  let d = new Date(year, month-1, day);
-  if (d < new Date(now.getFullYear(), now.getMonth(), now.getDate())) d = new Date(year+1, month-1, day);
-  return d;
-}
-
-function renderAnniversaries() {
-  const list = document.getElementById('anniversary-list');
-  if (!list) return;
-  list.innerHTML = '';
-  const items = Object.values(state.anniversaries).sort((a,b) => nextOccurrence(a.month,a.day) - nextOccurrence(b.month,b.day));
-  if (items.length === 0) {
-    list.innerHTML = '<p class="empty-state">등록된 생일·기념일이 없어요.</p>';
-    return;
-  }
-  items.forEach(a => {
-    const row = document.createElement('div');
-    row.className = 'anniversary-row';
-    const next = nextOccurrence(a.month, a.day);
-    const daysLeft = Math.ceil((next - new Date(new Date().toDateString())) / 86400000);
-    row.innerHTML = `
-      <span class="anniversary-icon">${a.type === 'birthday' ? '생일' : '기념일'}</span>
-      <span class="anniversary-name">${escapeHtml(a.title)}</span>
-      <span class="anniversary-date">${a.month}월 ${a.day}일</span>
-      ${daysLeft <= 14 ? `<span class="anniversary-badge">${daysLeft === 0 ? '오늘' : 'D-' + daysLeft}</span>` : ''}
-    `;
-    row.addEventListener('click', () => openAnniversaryModal(a));
-    list.appendChild(row);
-  });
-}
-
-const annivModal = document.getElementById('modal-anniversary');
-document.getElementById('btn-add-anniversary').addEventListener('click', () => openAnniversaryModal(null));
-document.getElementById('modal-anniversary-close').addEventListener('click', closeAnniversaryModal);
-annivModal.addEventListener('click', (e) => { if (e.target === annivModal) closeAnniversaryModal(); });
-
-function openAnniversaryModal(a) {
-  state.editingAnniversaryId = a ? a.id : null;
-  populateMonthDaySelects();
-  document.getElementById('anniversary-type').value = a?.type || 'birthday';
-  document.getElementById('anniversary-title').value = a?.title || '';
-  document.getElementById('anniversary-error').textContent = '';
-  if (a) {
-    document.getElementById('anniversary-month').value = a.month;
-    document.getElementById('anniversary-month').onchange();
-    document.getElementById('anniversary-day').value = a.day;
-  }
-  document.getElementById('btn-delete-anniversary').classList.toggle('hidden', !a);
-  annivModal.classList.remove('hidden');
-}
-function closeAnniversaryModal() { annivModal.classList.add('hidden'); state.editingAnniversaryId = null; }
-
-document.getElementById('form-anniversary').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const errEl = document.getElementById('anniversary-error');
-  errEl.textContent = '';
-  const data = {
-    type: document.getElementById('anniversary-type').value,
-    title: document.getElementById('anniversary-title').value.trim(),
-    month: parseInt(document.getElementById('anniversary-month').value, 10),
-    day: parseInt(document.getElementById('anniversary-day').value, 10),
-  };
-  if (!data.title) { errEl.textContent = '이름을 입력해주세요.'; return; }
-  try {
-    const col = db.collection('families').doc(state.familyId).collection('anniversaries');
-    if (state.editingAnniversaryId) {
-      await col.doc(state.editingAnniversaryId).update(data);
-    } else {
-      await col.add({ ...data, createdBy: state.memberId, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    }
-    closeAnniversaryModal();
-  } catch (err) {
-    errEl.textContent = `저장에 실패했어요 (${err.code || err.message})`;
-  }
-});
-
-document.getElementById('btn-delete-anniversary').addEventListener('click', async () => {
-  if (!state.editingAnniversaryId) return;
-  if (!confirm('삭제할까요?')) return;
-  await db.collection('families').doc(state.familyId).collection('anniversaries').doc(state.editingAnniversaryId).delete();
-  closeAnniversaryModal();
-});
-
-function checkUpcomingAnniversaries() {
-  const key = todayStr();
-  if (state.notifiedAnniversaryToday === key) return;
-  const todayItems = Object.values(state.anniversaries).filter(a => {
-    const next = nextOccurrence(a.month, a.day);
-    const daysLeft = Math.ceil((next - new Date(new Date().toDateString())) / 86400000);
-    return daysLeft === 0 || daysLeft === 3;
-  });
-  todayItems.forEach(a => {
-    const next = nextOccurrence(a.month, a.day);
-    const daysLeft = Math.ceil((next - new Date(new Date().toDateString())) / 86400000);
-    if (daysLeft === 0) notifyUser(`오늘은 ${a.title}${a.type === 'birthday' ? ' 생일' : ''}이에요`);
-    else notifyUser(`${a.title}이(가) 3일 뒤예요`, `${a.month}월 ${a.day}일`);
-  });
-  state.notifiedAnniversaryToday = key;
-}
 
 function formatRelativeTime(ts) {
   if (!ts || !ts.toDate) return '';
