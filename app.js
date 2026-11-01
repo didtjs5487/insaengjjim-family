@@ -1128,6 +1128,13 @@ document.getElementById('wish-search-clear').addEventListener('click', () => {
   input.focus();
 });
 
+// 목록 줄에서는 가격을 맨 앞으로 — 훑어볼 때 분류보다 가격이 더 쓸모 있다
+function rowNote(notes) {
+  const parts = notes.split(" · ");
+  const i = parts.findIndex(p => p.startsWith("가격 "));
+  if (i > 0) parts.unshift(parts.splice(i, 1)[0]);
+  return parts.join(" · ");
+}
 function buildWishRow(w, ignite) {
   const cat = catOf(w);
   const meta = WISH_CAT_META[cat];
@@ -1141,7 +1148,7 @@ function buildWishRow(w, ignite) {
     <span class="wish-thumb">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : icon(meta.icon, 'ic-lg')}</span>
     <span class="wish-main">
       <span class="wish-title">${escapeHtml(w.title)}</span>
-      ${w.notes ? `<span class="wish-note">${escapeHtml(w.notes)}</span>` : ''}
+      ${w.notes ? `<span class="wish-note">${escapeHtml(rowNote(w.notes))}</span>` : ''}
     </span>
     <span class="wish-side">${icon(meta.icon)}<span class="wish-date">${date}</span></span>`;
   const img = row.querySelector('img');
