@@ -101,6 +101,23 @@ function toast(msg) {
 }
 
 /* ---- 모션 도우미 ---- */
+// 칸의 숫자가 0에서(또는 이전 값에서) 새 값까지 올라간다
+function countUp(el, to) {
+  const known = el.dataset.shown !== undefined;
+  const from = known ? Number(el.dataset.shown) : (Number(el.textContent) || 0);
+  if (known && from === to) return;
+  el.dataset.shown = to;
+  cancelAnimationFrame(el._raf); clearTimeout(el._cto);
+  if (from === to || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = to; return; }
+  const dur = 750, t0 = performance.now();
+  const step = (t) => {
+    const p = Math.min(1, (t - t0) / dur);
+    el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3)));
+    if (p < 1) el._raf = requestAnimationFrame(step); else restartAnim(el, 'bump');
+  };
+  el._raf = requestAnimationFrame(step);
+  el._cto = setTimeout(() => { el.textContent = to; }, dur + 80);
+}
 function restartAnim(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
 // 화면·칸·종류를 바꿨을 때 목록 줄이 위에서부터 차례로 올라온다
 function staggerList(list) {
@@ -117,7 +134,7 @@ const bumpObserver = new MutationObserver(muts => muts.forEach(m => {
   if (el.dataset.prev !== undefined && el.dataset.prev !== v) restartAnim(el, 'bump');
   el.dataset.prev = v;
 }));
-document.querySelectorAll('.cat-tile-count, .status-chip-count, .seg .num').forEach(el => {
+document.querySelectorAll('.status-chip-count, .seg .num').forEach(el => {
   el.dataset.prev = el.textContent;
   bumpObserver.observe(el, { childList: true });
 });
@@ -1129,7 +1146,7 @@ function renderWishes() {
   const filter = state.wishFilter;
 
   WISH_CATEGORIES.forEach(cat => {
-    document.getElementById(`tile-count-${cat}`).textContent = all.filter(w => !w.done && catOf(w) === cat).length;
+    countUp(document.getElementById(`tile-count-${cat}`), all.filter(w => !w.done && catOf(w) === cat).length);
   });
   document.querySelectorAll('.cat-tile').forEach(t => {
     const on = t.dataset.cat === filter;
