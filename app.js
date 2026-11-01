@@ -560,66 +560,45 @@ function renderShopping() {
   const list = document.getElementById('shopping-list');
   if (!list) return;
   list.innerHTML = '';
+  // 체크하면 목록에서 빠진다 — 예전에 "구매 완료"로 남은 항목은 보이지 않게 거른다
   const items = Object.values(state.shopping)
-    .sort((a,b) => (a.purchased === b.purchased) ? 0 : (a.purchased ? 1 : -1));
+    .filter(i => !i.purchased)
+    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
   if (items.length === 0) {
-    list.innerHTML = '<p class="empty-state">사고 싶은 물건을 추가해보세요.</p>';
+    list.innerHTML = '<p class="empty-state">살 것이 없어요. 위에 적어서 추가하세요.</p>';
     return;
   }
   items.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'shopping-item' + (item.purchased ? ' purchased' : '');
-    const requesterName = state.members[item.requestedBy]?.name || '?';
-    const priceLabel = item.price != null ? `${Number(item.price).toLocaleString('ko-KR')}원` : '';
+    row.className = 'shopping-item';
     row.innerHTML = `
-      <button type="button" class="task-checkbox ${item.purchased ? 'checked' : ''}" aria-label="${item.purchased ? '구매 취소' : '구매 완료'}">${item.purchased ? icon('check', 'ic-sm') : ''}</button>
+      <button type="button" class="task-checkbox" aria-label="샀어요, 목록에서 빼기"></button>
       <div class="shopping-body">
         <span class="shopping-name">${escapeHtml(item.name)}${item.qty ? ` <span class="shopping-qty">${escapeHtml(item.qty)}</span>` : ''}</span>
-        ${(priceLabel || item.link) ? `<span class="shopping-sub">
-          ${priceLabel ? `<span class="shopping-price">${priceLabel}</span>` : ''}
-          ${item.link ? `<a class="shopping-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">구매 링크</a>` : ''}
-        </span>` : ''}
-        <span class="shopping-meta">${escapeHtml(requesterName)}님 요청</span>
       </div>
-      <button class="shopping-delete-btn" title="삭제" aria-label="삭제">${icon('x', 'ic-sm')}</button>
     `;
-    row.querySelector('.task-checkbox').addEventListener('click', () => toggleShoppingPurchased(item));
-    row.querySelector('.shopping-delete-btn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      db.collection('families').doc(state.familyId).collection('shopping').doc(item.id).delete();
+    row.querySelector('.task-checkbox').addEventListener('click', (e) => {
+      e.currentTarget.classList.add('checked');
+      e.currentTarget.innerHTML = icon('check', 'ic-sm');
+      row.classList.add('purchased');
+      setTimeout(() => {
+        db.collection('families').doc(state.familyId).collection('shopping').doc(item.id).delete();
+      }, 350);
     });
     list.appendChild(row);
-  });
-}
-
-async function toggleShoppingPurchased(item) {
-  await db.collection('families').doc(state.familyId).collection('shopping').doc(item.id).update({
-    purchased: !item.purchased,
-    purchasedBy: !item.purchased ? state.memberId : null,
   });
 }
 
 document.getElementById('form-shopping-add').addEventListener('submit', async (e) => {
   e.preventDefault();
   const nameInput = document.getElementById('shopping-item-name');
-  const qtyInput = document.getElementById('shopping-item-qty');
-  const priceInput = document.getElementById('shopping-item-price');
-  const linkInput = document.getElementById('shopping-item-link');
   const name = nameInput.value.trim();
   if (!name) return;
-  const qty = qtyInput.value.trim() || null;
-  const priceRaw = priceInput.value.trim();
-  const price = priceRaw ? Number(priceRaw) : null;
-  let link = linkInput.value.trim() || null;
-  if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
-  await db.collection('families').doc(state.familyId).collection('shopping').add({
-    name, qty, price, link, purchased: false, requestedBy: state.memberId, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
   nameInput.value = '';
-  qtyInput.value = '';
-  priceInput.value = '';
-  linkInput.value = '';
-  toast(`"${name}" 추가했어요`);
+  nameInput.focus();
+  await db.collection('families').doc(state.familyId).collection('shopping').add({
+    name, purchased: false, requestedBy: state.memberId, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
 });
 
 /* ===================== Wishlist: 장소 · 음식 · 물건 ===================== */

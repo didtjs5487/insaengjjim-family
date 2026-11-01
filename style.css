@@ -236,22 +236,12 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 .event-assignee-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.07); border-radius: 99px; padding: 2px 9px 2px 3px; font-size: 12.5px; color: var(--text); }
 .avatar-dot { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ground); font-size: 10px; font-weight: 900; }
 .avatar-dot.mini { width: 20px; height: 20px; }
-.shopping-add-row { display: flex; gap: 8px; margin-bottom: 8px; }
-.shopping-add-row input { flex: 1; min-width: 0; }
-.shopping-add-row .shopping-qty-input { flex: 0 0 96px; }
-.shopping-add-btn { align-self: flex-end; }
+.shopping-quick { display: flex; gap: 8px; margin-bottom: 14px; }
+.shopping-quick input { flex: 1; min-width: 0; }
 .wish-add { display: flex; flex-direction: column; gap: 8px; }
 .shopping-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .shopping-name { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
 .shopping-qty { font-family: var(--font-data); color: var(--muted); font-size: 13px; }
-.shopping-sub { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.shopping-price { font-family: var(--font-data); font-weight: 500; font-size: 13px; color: var(--lime); }
-.shopping-link { font-size: 13px; font-weight: 700; color: var(--cyan); text-decoration: none; }
-.shopping-meta { font-size: 12px; color: var(--muted); }
-.shopping-delete-btn { background: none; border: 0; color: var(--muted); width: 40px; height: 40px; font-size: 16px; cursor: pointer; border-radius: 10px; }
-.shopping-delete-btn:active { color: var(--danger); }
-.add-divider { display: flex; align-items: center; gap: 12px; margin: 26px 0 14px; color: var(--muted); font-size: 13px; font-weight: 700; }
-.add-divider::before, .add-divider::after { content: ''; height: 1px; flex: 1; background: var(--line); }
 
 /* ===== Settings sub-page ===== */
 .subpage-header { display: flex; align-items: center; gap: 10px; margin: 8px 0 18px; }

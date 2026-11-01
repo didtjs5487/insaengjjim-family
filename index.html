@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gugi&family=JetBrains+Mono:wght@500&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 
@@ -174,20 +174,11 @@
       <div class="section-header">
         <h2 class="section-title">장보기</h2>
       </div>
-      <div id="shopping-list" class="list"></div>
-
-      <div class="add-divider">새로 담기</div>
-      <form id="form-shopping-add" class="wish-add">
-        <div class="shopping-add-row">
-          <input type="text" id="shopping-item-name" placeholder="예: 화장지, 우유" required>
-          <input type="text" id="shopping-item-qty" placeholder="수량" class="shopping-qty-input" inputmode="numeric">
-        </div>
-        <div class="shopping-add-row">
-          <input type="number" id="shopping-item-price" placeholder="단가(선택, 원)" min="0" inputmode="numeric">
-          <input type="text" id="shopping-item-link" placeholder="구매 링크(선택)" inputmode="url" autocapitalize="off" autocorrect="off">
-        </div>
+      <form id="form-shopping-add" class="shopping-quick">
+        <input type="text" id="shopping-item-name" placeholder="살 것 적고 추가 (예: 우유 2개)" required enterkeyhint="done" autocomplete="off">
         <button type="submit" class="btn btn-pin btn-small shopping-add-btn"><svg class="ic ic-sm"><use href="#i-plus"/></svg>추가</button>
       </form>
+      <div id="shopping-list" class="list"></div>
     </div>
 
   </section>
@@ -399,6 +390,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>
