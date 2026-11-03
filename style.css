@@ -413,16 +413,12 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 .modal-overlay:not(.hidden) { animation: fade-in .2s ease-out; }
 
 /* ===== 네온 간판 글자: 흰 심지 + 분홍 빛, 가끔 '생' 한 글자만 깜빡 ===== */
-.tube { --glow: #ff2e88; color: #fff; -webkit-text-stroke: .7px #ff5fa6; paint-order: stroke fill;
-  text-shadow: 0 0 1px #fff, 0 0 3px var(--glow), 0 0 7px color-mix(in srgb, var(--glow) 75%, transparent), 0 0 14px color-mix(in srgb, var(--glow) 28%, transparent); }
-.brand-small.tube { position: relative; padding-bottom: 5px; }
-.brand-small.tube::after, .brand.tube::after {
-  content: ''; position: absolute; left: 3%; right: 3%; bottom: 0; height: 2px; border-radius: 2px; background: #eaffff;
-  box-shadow: 0 0 2px #fff, 0 0 4px #19f0ff, 0 0 9px color-mix(in srgb, #19f0ff 60%, transparent);
-}
-.brand.tube { position: relative; display: block; width: fit-content; margin: 0 auto 14px; padding-bottom: 8px; }
-.brand.tube::after { height: 3px; }
-.tube > span { display: inline-block; }
+.tube { --mint: #3dfff0; --pink: #ff3d94; color: var(--mint);
+  text-shadow: 0 0 3px color-mix(in srgb, var(--mint) 85%, transparent), 0 0 9px color-mix(in srgb, var(--mint) 40%, transparent); }
+.brand.tube { display: block; width: fit-content; margin: 0 auto 14px; }
+/* 글자 두 겹: 아래는 두꺼운 민트 윤곽, 위는 분홍 속 */
+.tube > span { position: relative; display: inline-block; -webkit-text-stroke: 4px var(--mint); }
+.tube > span::before { content: attr(data-t); position: absolute; left: 0; top: 0; color: var(--pink); -webkit-text-stroke: 0; text-shadow: 0 0 2px #ff9cc8, 0 0 6px color-mix(in srgb, var(--pink) 60%, transparent); }
 @keyframes tube-flicker {
   0%, 17%, 21%, 55%, 58%, 100% { opacity: 1; text-shadow: inherit; }
   18% { opacity: .35; text-shadow: 0 0 2px rgba(255,255,255,.4); }
