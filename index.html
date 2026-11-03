@@ -271,6 +271,8 @@
       </div>
       <input type="text" id="wish-tag" aria-label="분류 (선택)" placeholder="분류 (선택) 예: 스탠드·거치대" autocomplete="off" enterkeyhint="next">
       <div class="tag-suggest" id="wish-tag-suggest"></div>
+      <label class="field-label" for="wish-price">가격 <span class="opt">(선택)</span></label>
+      <input type="text" id="wish-price" placeholder="숫자만 쓰면 원으로 · 달러는 $20처럼" autocomplete="off" enterkeyhint="next">
       <label class="field-label" for="wish-notes">상세정보</label>
       <input type="text" id="wish-notes" placeholder="위치, 특징 등" autocomplete="off">
       <label class="field-label" for="wish-link">링크</label>
@@ -337,6 +339,8 @@
         </div>
         <input type="text" id="wish-detail-tag-input" aria-label="분류 (선택)" placeholder="분류 (선택)" autocomplete="off">
         <div class="tag-suggest" id="wish-detail-tag-suggest"></div>
+        <label class="field-label" for="wish-detail-price-input">가격 <span class="opt">(선택)</span></label>
+        <input type="text" id="wish-detail-price-input" placeholder="숫자만 쓰면 원으로 · 달러는 $20처럼" autocomplete="off" enterkeyhint="next">
         <label class="field-label" for="wish-detail-notes-input">상세정보</label>
         <input type="text" id="wish-detail-notes-input" autocomplete="off">
         <label class="field-label" for="wish-detail-link-input">링크</label>
@@ -447,6 +451,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=47"></script>
+<script src="app.js?v=48"></script>
 </body>
 </html>

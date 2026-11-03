@@ -729,7 +729,7 @@ const WISH_CATEGORIES = ['place', 'food', 'gift'];
 const WISH_CAT_META = {
   place: { icon: 'pin',  label: '장소', long: '가고 싶은 곳',   done: '다녀왔어요', hint: '위치, 특징 등' },
   food:  { icon: 'food', label: '음식', long: '먹고 싶은 음식', done: '먹었어요',   hint: '가게 이름, 메뉴 등' },
-  gift:  { icon: 'bag',  label: '물건', long: '갖고 싶은 것',   done: '샀어요',     hint: '사이즈, 색상, 가격대 등' },
+  gift:  { icon: 'bag',  label: '물건', long: '갖고 싶은 것',   done: '샀어요',     hint: '사이즈, 색상 등' },
 };
 const WISH_DONE_WORD = { all: '완료', place: '다녀옴', food: '먹음', gift: '산 것' };
 const WISH_DONE_EMPTY = {
@@ -963,6 +963,38 @@ function migrateTagsFromNotes() {
   batch.commit().catch(() => {}).finally(() => { state._tagMigrating = false; });
 }
 
+/* ---- 가격: 숫자만 쓰면 천 단위 쉼표를 넣고, 저장할 때 '원'을 붙인다. $·달러 등 글자가 섞이면 쓴 그대로 둔다. 메모에는 "가격 12,000원"으로 들어간다 ---- */
+const PRICE_WON = /^₩?[\d,\s]*원?$/;
+const priceFinal = (v) => {
+  v = (v || '').trim();
+  if (!v || !/\d/.test(v) || !PRICE_WON.test(v)) return v;
+  return Number(v.replace(/\D/g, '').slice(0, 12)).toLocaleString('ko-KR') + '원';
+};
+const withPrice = (notes, price) => [notes, price ? '가격 ' + price : ''].filter(Boolean).join(' · ') || null;
+function splitPrice(notes) {
+  const parts = (notes || '').split(' · ');
+  const i = parts.findIndex(p => /^가격\s/.test(p));
+  const price = i >= 0 ? parts.splice(i, 1)[0].replace(/^가격\s*/, '') : '';
+  return { price, rest: parts.join(' · ') };
+}
+function bindPriceInput(id) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    const v = el.value;
+    if (!/\d/.test(v) || !PRICE_WON.test(v)) return;
+    const digitsBefore = v.slice(0, el.selectionStart).replace(/\D/g, '').length;
+    const out = Number(v.replace(/\D/g, '').slice(0, 12)).toLocaleString('ko-KR');
+    if (out === v) return;
+    el.value = out;
+    let pos = 0, seen = 0;
+    while (pos < out.length && seen < digitsBefore) { if (/\d/.test(out[pos])) seen++; pos++; }
+    el.setSelectionRange(pos, pos);
+  });
+  el.addEventListener('blur', () => { el.value = priceFinal(el.value); });
+}
+bindPriceInput('wish-price');
+bindPriceInput('wish-detail-price-input');
+
 /* ---- add sheet ---- */
 const wishAddModal = document.getElementById('modal-wish-add');
 function openWishAdd(prefill = {}) {
@@ -970,6 +1002,7 @@ function openWishAdd(prefill = {}) {
   const pickable = !!prefill.pick;
   document.getElementById('wish-title').value = prefill.title || '';
   document.getElementById('wish-notes').value = '';
+  document.getElementById('wish-price').value = '';
   document.getElementById('wish-link').value = prefill.link || '';
   let cat0 = prefill.cat;
   if (!cat0 && wishUi.tag && wishUi.tag !== '__none') { const hit = Object.values(state.wishes).find(w => w.tag === wishUi.tag); if (hit) cat0 = catOf(hit); }
@@ -1048,7 +1081,7 @@ document.getElementById('form-wish-add').addEventListener('submit', async (e) =>
     await wishColl().add({
       title, category: selectedWishCat,
       tag: document.getElementById('wish-tag').value.trim() || null,
-      notes: document.getElementById('wish-notes').value.trim() || null,
+      notes: withPrice(document.getElementById('wish-notes').value.trim(), priceFinal(document.getElementById('wish-price').value)),
       link: normalizeLink(document.getElementById('wish-link').value),
       photo: photoSlots.add.data || null,
       done: false, requestedBy: state.memberId,
@@ -1080,11 +1113,11 @@ const IMPORT_HEADERS = [
 ];
 const IMPORT_DONE = /^(완료|구입|구매|샀|샀음|샀어요|구입함|구매함|구입완료|구매완료|구입 완료|구매 완료|o|v|y|yes|true|✓|✔)$/i;
 const IMPORT_IMG = /^https?:\/\/\S+\.(jpe?g|png|webp|gif|avif)(\?\S*)?$/i;
-const importPriceLabel = (v) => {
+const importPriceLabel = (v, sure) => {
   const m = v.replace(/\s/g, '').match(/^₩?([\d,]+)원?$/);
   if (!m) return null;
   const digits = m[1].replace(/,/g, '');
-  if (!/원/.test(v) && digits.length < 4) return null;
+  if (!sure && !/원/.test(v) && digits.length < 4) return null;
   return Number(digits).toLocaleString('ko-KR') + '원';
 };
 function parseImportText(text, cat) {
@@ -1116,7 +1149,7 @@ function parseImportText(text, cat) {
         else if (role === 'status') { if (IMPORT_DONE.test(cell)) done = true; else if (cell !== '후보' && cell !== '보류') details.push(cell); }
         else if (role === 'photo' || (!role && IMPORT_IMG.test(cell))) { if (/^https?:/i.test(cell)) photo = cell; }
         else if (role === 'link' || (!role && /^https?:\/\//i.test(cell))) link = normalizeLink(cell);
-        else if (role === 'price' || (!role && importPriceLabel(cell))) { const lab = importPriceLabel(cell); if (lab) price = lab; else if (!/미확인|^-$/.test(cell)) price = cell; }
+        else if (role === 'price' || (!role && importPriceLabel(cell))) { const lab = importPriceLabel(cell, role === 'price'); if (lab) price = lab; else if (!/미확인|^-$/.test(cell)) price = cell; }
         else if (role === 'done' || (!role && IMPORT_DONE.test(cell))) done = done || IMPORT_DONE.test(cell);
         else details.push(cell);
       });
@@ -1440,7 +1473,9 @@ document.getElementById('btn-edit-wish').addEventListener('click', () => {
   document.getElementById('wish-detail-title-input').value = w.title || '';
   paintPicker('wish-detail-cat-picker', editingWishCat);
   const notes = document.getElementById('wish-detail-notes-input');
-  notes.value = w.notes || '';
+  const sp = splitPrice(w.notes);
+  notes.value = sp.rest;
+  document.getElementById('wish-detail-price-input').value = sp.price;
   notes.placeholder = WISH_CAT_META[editingWishCat].hint;
   document.getElementById('wish-detail-link-input').value = w.link || '';
   document.getElementById('wish-detail-tag-input').value = w.tag || '';
@@ -1460,7 +1495,7 @@ document.getElementById('form-wish-edit').addEventListener('submit', async (e) =
     await wishColl().doc(editingWishId).update({
       title, category: editingWishCat,
       tag: document.getElementById('wish-detail-tag-input').value.trim() || null,
-      notes: document.getElementById('wish-detail-notes-input').value.trim() || null,
+      notes: withPrice(document.getElementById('wish-detail-notes-input').value.trim(), priceFinal(document.getElementById('wish-detail-price-input').value)),
       link: normalizeLink(document.getElementById('wish-detail-link-input').value),
       photo: photoSlots.edit.data || null,
     });
