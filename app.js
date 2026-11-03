@@ -1033,7 +1033,7 @@ function parseImportText(text, cat) {
         if (!cell) return;
         const role = map ? map[idx] : (idx === 0 ? 'title' : null);
         if (role === 'title') title = cell;
-        else if (role === 'status') { if (IMPORT_DONE.test(cell)) done = true; else if (cell !== '후보') details.push(cell); }
+        else if (role === 'status') { if (IMPORT_DONE.test(cell)) done = true; else if (cell !== '후보' && cell !== '보류') details.push(cell); }
         else if (role === 'photo' || (!role && IMPORT_IMG.test(cell))) { if (/^https?:/i.test(cell)) photo = cell; }
         else if (role === 'link' || (!role && /^https?:\/\//i.test(cell))) link = normalizeLink(cell);
         else if (role === 'price' || (!role && importPriceLabel(cell))) { const lab = importPriceLabel(cell); if (lab) price = lab; else if (!/미확인|^-$/.test(cell)) price = cell; }
@@ -1130,7 +1130,7 @@ document.getElementById('wish-search-clear').addEventListener('click', () => {
 });
 
 // 목록 줄에서는 가격을 맨 앞으로 — 훑어볼 때 분류보다 가격이 더 쓸모 있다
-const dropSheetTags = (notes) => (notes || '').split(' · ').filter(p => p !== '후보').join(' · ');
+const dropSheetTags = (notes) => (notes || '').split(' · ').filter(p => p !== '후보' && p !== '보류').join(' · ');
 function rowNote(notes) {
   const parts = dropSheetTags(notes).split(" · ").filter(Boolean);
   const i = parts.findIndex(p => p.startsWith("가격 "));
