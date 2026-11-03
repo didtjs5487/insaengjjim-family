@@ -1095,7 +1095,8 @@ function parseImportText(text, cat) {
   const first = split(lines[0]);
   const hdr = first.map(cell => (IMPORT_HEADERS.find(([, re]) => re.test(cell.replace(/\s/g, ''))) || [])[0]);
   if (first.length > 1 && hdr.filter(Boolean).length >= 2 && hdr.includes('title')) { map = hdr; lines.shift(); }
-  const existing = new Set(Object.values(state.wishes).filter(w => catOf(w) === cat).map(w => w.title.trim().toLowerCase()));
+  const existing = new Map();
+  Object.values(state.wishes).filter(w => catOf(w) === cat).forEach(w => { const k = (w.title || '').trim().toLowerCase(); if (!existing.has(k)) existing.set(k, w); });
   const seen = new Set();
   const items = [];
   lines.forEach(line => {
@@ -1123,24 +1124,27 @@ function parseImportText(text, cat) {
     if (!title) return;
     const key = title.toLowerCase();
     const dup = existing.has(key) || seen.has(key);
+    const ex = existing.get(key);
     seen.add(key);
     const notes = [details.join(' · '), price ? '가격 ' + price : ''].filter(Boolean).join(' · ') || null;
-    items.push({ title, notes, tag, link, photo, done, dup });
+    items.push({ title, notes, tag, link, photo, done, dup, existingId: ex ? ex.id : null, existingHasPhoto: !!(ex && ex.photo) });
   });
   return items;
 }
 function refreshImportSummary() {
   const items = parseImportText(document.getElementById('import-text').value, document.getElementById('import-cat').value);
   const fresh = items.filter(i => !i.dup);
+  const fill = items.filter(i => i.dup && i.photo && i.existingId && !i.existingHasPhoto);
   const sum = document.getElementById('import-summary');
   const btn = document.getElementById('btn-import');
-  if (!items.length) { sum.textContent = '붙여넣으면 몇 개인지 보여드려요.'; btn.disabled = true; btn.textContent = '가져오기'; return fresh; }
+  if (!items.length) { sum.textContent = '붙여넣으면 몇 개인지 보여드려요.'; btn.disabled = true; btn.textContent = '가져오기'; return { fresh, fill }; }
   const done = fresh.filter(i => i.done).length;
   const pics = fresh.filter(i => i.photo).length;
-  sum.textContent = `${fresh.length}개를 넣어요${done ? ` (구입 표시 ${done}개는 보관함으로)` : ''}${pics ? ` · 사진 ${pics}개` : ''}${items.length - fresh.length ? ` · 이미 있는 ${items.length - fresh.length}개는 건너뛰어요` : ''}`;
-  btn.disabled = fresh.length === 0;
-  btn.textContent = fresh.length ? `${fresh.length}개 가져오기` : '가져오기';
-  return fresh;
+  sum.textContent = `${fresh.length}개를 넣어요${done ? ` (구입 표시 ${done}개는 보관함으로)` : ''}${pics ? ` · 사진 ${pics}개` : ''}${items.length - fresh.length - fill.length ? ` · 이미 있는 ${items.length - fresh.length - fill.length}개는 건너뛰어요` : ''}${fill.length ? ` · 이미 있는 ${fill.length}개에는 사진만 채워요` : ''}`;
+  if (!fresh.length) sum.textContent = fill.length ? `이미 있는 ${fill.length}개에 사진만 채워요` : sum.textContent;
+  btn.disabled = fresh.length + fill.length === 0;
+  btn.textContent = fresh.length ? `${fresh.length}개 가져오기` : (fill.length ? `사진 ${fill.length}개 채우기` : '가져오기');
+  return { fresh, fill };
 }
 document.getElementById('btn-import-paste').addEventListener('click', async () => {
   try {
@@ -1151,8 +1155,8 @@ document.getElementById('btn-import-paste').addEventListener('click', async () =
 document.getElementById('import-text').addEventListener('input', refreshImportSummary);
 document.getElementById('import-cat').addEventListener('change', refreshImportSummary);
 document.getElementById('btn-import').addEventListener('click', async (e) => {
-  const fresh = refreshImportSummary();
-  if (!fresh.length) return;
+  const { fresh, fill } = refreshImportSummary();
+  if (!fresh.length && !fill.length) return;
   const btn = e.currentTarget;
   btn.disabled = true;
   const cat = document.getElementById('import-cat').value;
@@ -1170,11 +1174,16 @@ document.getElementById('btn-import').addEventListener('click', async (e) => {
       });
       await batch.commit();
     }
+    for (let start = 0; start < fill.length; start += 400) {
+      const batch = db.batch();
+      fill.slice(start, start + 400).forEach(it => batch.update(wishColl().doc(it.existingId), { photo: it.photo }));
+      await batch.commit();
+    }
     document.getElementById('import-text').value = '';
     refreshImportSummary();
     state.wishFilter = 'all'; wishUi.state = 'open'; wishUi.query = ''; wishUi.tag = '';
     document.getElementById('wish-search').value = '';
-    toast(`${fresh.length}개 넣었어요`);
+    toast(fresh.length ? `${fresh.length}개 넣었어요${fill.length ? ` · 사진 ${fill.length}개 채웠어요` : ''}` : `사진 ${fill.length}개 채웠어요`);
     showTab('request');
     applyGoodsView('wish');
     renderWishes();
@@ -1231,7 +1240,7 @@ function buildWishRow(w, ignite) {
   row.dataset.cat = cat;
   const date = shortDate(w.done && w.doneAt ? w.doneAt : w.createdAt);
   row.innerHTML = `
-    ${src ? `<span class="wish-thumb"><img src="${escapeHtml(src)}" alt="" loading="lazy"></span>` : ''}
+    ${src ? `<span class="wish-thumb"><img src="${escapeHtml(src)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>` : ''}
     <span class="wish-main">
       <span class="wish-title">${escapeHtml(w.title)}</span>
       ${(w.tag || w.notes) ? `<span class="wish-note">${w.tag ? `<b class="wish-tag">${escapeHtml(w.tag)}</b>` : ''}${escapeHtml(rowNote(w.notes))}</span>` : ''}
