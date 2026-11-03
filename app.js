@@ -1185,6 +1185,11 @@ document.getElementById('btn-import').addEventListener('click', async (e) => {
 });
 
 /* ---- list: tiles filter, search, 남은 것 / 다녀옴 ---- */
+document.getElementById('btn-show-all').addEventListener('click', () => {
+  state.wishFilter = 'all';
+  wishUi.tag = '';
+  renderWishes();
+});
 document.querySelectorAll('.cat-tile').forEach(tile => {
   tile.addEventListener('click', () => {
     state.wishFilter = state.wishFilter === tile.dataset.cat ? 'all' : tile.dataset.cat;
@@ -1276,6 +1281,9 @@ function renderWishes() {
     t.setAttribute('aria-pressed', on);
   });
   document.getElementById('cat-tiles').classList.toggle('has-on', filter !== 'all');
+  const note = document.getElementById('filter-note');
+  note.classList.toggle('hidden', filter === 'all');
+  if (filter !== 'all') { note.dataset.cat = filter; document.getElementById('filter-note-text').innerHTML = `<b>${WISH_CAT_META[filter].label}</b>만 보는 중`; }
   syncWishFab();
 
   const inCat = all.filter(w => filter === 'all' || catOf(w) === filter);

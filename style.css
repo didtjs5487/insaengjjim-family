@@ -454,3 +454,9 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 
 /* ===== 정렬 ===== */
 .sort-select { width: auto; min-height: 44px; padding: 0 14px; border-radius: 99px; background: transparent; border: 1px solid var(--line-2); color: var(--muted); font-weight: 700; font-size: 13.5px; cursor: pointer; }
+
+/* ===== 칸을 고른 상태 안내 + 전체 보기 ===== */
+.filter-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 2px 0; font-size: 14px; color: var(--muted); }
+.filter-note b { color: var(--c); }
+.filter-note button { min-height: 44px; padding: 0 16px; border-radius: 99px; background: transparent; color: var(--text); border: 1px solid var(--line-2); font-weight: 700; font-size: 14px; cursor: pointer; }
+.filter-note button:active { background: rgba(255,255,255,0.1); }
