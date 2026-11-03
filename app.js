@@ -693,6 +693,7 @@ function renderShopping() {
       <button type="button" class="task-checkbox" aria-label="샀어요, 목록에서 빼기"></button>
       <div class="shopping-body">
         <span class="shopping-name">${escapeHtml(item.name)}${item.qty ? ` <span class="shopping-qty">${escapeHtml(item.qty)}</span>` : ''}</span>
+        ${item.link ? `<a class="shopping-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkHost(item.link) || '링크')} ↗</a>` : ''}
       </div>
     `;
     row.querySelector('.task-checkbox').addEventListener('click', (e) => {
@@ -1266,6 +1267,7 @@ function openWishModal(w) {
     ? `${icon('undo')}다시 찜하기`
     : `${icon('check')}${meta.done}`;
 
+  document.getElementById('btn-wish-to-shopping').parentElement.classList.toggle('hidden', !!w.done);
   showWishViewMode(true);
   wishModal.classList.remove('hidden');
 }
@@ -1280,6 +1282,23 @@ document.getElementById('btn-wish-detail-heart').addEventListener('click', async
   await toggleWishDone(w);
   closeWishModal();
   toast(w.done ? '다시 찜했어요' : `"${w.title}" ${meta.done}`);
+});
+document.getElementById('btn-wish-to-shopping').addEventListener('click', async () => {
+  const w = state.wishes[editingWishId];
+  if (!w) return;
+  if (!confirm(`"${w.title}"을(를) 장보기로 옮길까요?\n찜 목록에서는 빠져요.`)) return;
+  const fam = db.collection('families').doc(state.familyId);
+  const batch = db.batch();
+  batch.set(fam.collection('shopping').doc(), {
+    name: w.title, link: w.link || null, purchased: false,
+    requestedBy: state.memberId, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  batch.delete(wishColl().doc(w.id));
+  try {
+    await batch.commit();
+    closeWishModal();
+    toast('장보기로 옮겼어요');
+  } catch (err) { toast('옮기기 실패: ' + (err.code || err.message)); }
 });
 document.getElementById('btn-delete-wish').addEventListener('click', async () => {
   if (!editingWishId) return;

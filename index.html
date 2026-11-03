@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gugi&family=JetBrains+Mono:wght@500&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=29">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 
@@ -299,6 +299,9 @@
         <button type="button" id="btn-edit-wish" class="btn btn-secondary" aria-label="수정"><svg class="ic"><use href="#i-edit"/></svg></button>
         <button type="button" id="btn-wish-detail-heart" class="btn btn-primary"></button>
       </div>
+      <div class="detail-move">
+        <button type="button" id="btn-wish-to-shopping" class="btn btn-secondary"><svg class="ic ic-sm"><use href="#i-cart"/></svg>장보기로 옮기기</button>
+      </div>
     </div>
 
     <form id="form-wish-edit" class="hidden">
@@ -421,6 +424,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>
