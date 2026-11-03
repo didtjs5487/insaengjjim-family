@@ -333,6 +333,7 @@ function enterFamily(familyId) {
       snap.forEach(doc => { state.wishes[doc.id] = { id: doc.id, ...doc.data() }; });
       renderWishes();
       migrateTagsFromNotes();
+      migratePrices();
     });
 
   showScreen('screen-app');
@@ -961,6 +962,27 @@ function migrateTagsFromNotes() {
     batch.update(wishColl().doc(w.id), { tag: m[2].trim(), notes: m[3] ? `${m[1]} · ${m[3]}` : m[1] });
   });
   batch.commit().catch(() => {}).finally(() => { state._tagMigrating = false; });
+}
+// 숫자만 적혀 있던 예전 가격("가격 12000")도 천 단위 쉼표+원으로 한 번 고친다. $·달러 등은 건드리지 않는다
+function migratePrices() {
+  if (state._priceMigrating || !state.familyId) return;
+  const todo = [];
+  Object.values(state.wishes).forEach(w => {
+    if (!w.notes) return;
+    let changed = false;
+    const parts = w.notes.split(' · ').map(p => {
+      const m = p.match(/^가격\s*(₩?[\d,]+원?)$/);
+      const fixed = m ? '가격 ' + priceFinal(m[1]) : p;
+      if (fixed !== p) changed = true;
+      return fixed;
+    });
+    if (changed) todo.push([w, parts.join(' · ')]);
+  });
+  if (!todo.length) return;
+  state._priceMigrating = true;
+  const batch = db.batch();
+  todo.slice(0, 400).forEach(([w, notes]) => batch.update(wishColl().doc(w.id), { notes }));
+  batch.commit().catch(() => {}).finally(() => { state._priceMigrating = false; });
 }
 
 /* ---- 가격: 숫자만 쓰면 천 단위 쉼표를 넣고, 저장할 때 '원'을 붙인다. $·달러 등 글자가 섞이면 쓴 그대로 둔다. 메모에는 "가격 12,000원"으로 들어간다 ---- */
