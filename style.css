@@ -451,3 +451,6 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 /* ===== 사진 없는 줄: 같은 아이콘 대신 이름 중심의 촘촘한 줄 ===== */
 .wish-row.no-thumb { grid-template-columns: 1fr auto; min-height: 58px; padding: 10px 12px 10px 14px; }
 .wish-row.no-thumb .wish-side { align-self: start; }
+
+/* ===== 정렬 ===== */
+.sort-select { width: auto; min-height: 44px; padding: 0 14px; border-radius: 99px; background: transparent; border: 1px solid var(--line-2); color: var(--muted); font-weight: 700; font-size: 13.5px; cursor: pointer; }

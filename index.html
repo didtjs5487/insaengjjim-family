@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gugi&family=JetBrains+Mono:wght@500&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=39">
+<link rel="stylesheet" href="style.css?v=40">
 </head>
 <body>
 
@@ -165,7 +165,13 @@
           <button type="button" class="on" data-wstate="open">남은 것 <span class="num" id="seg-open">0</span></button>
           <button type="button" data-wstate="done">다녀옴 <span class="num" id="seg-done">0</span></button>
         </div>
-        <span class="sort-note">최신순</span>
+        <select id="wish-sort" class="sort-select" aria-label="정렬">
+          <option value="new">최신순</option>
+          <option value="old">오래된순</option>
+          <option value="name">이름순</option>
+          <option value="low">가격 낮은순</option>
+          <option value="high">가격 높은순</option>
+        </select>
       </div>
       <div class="tag-bar hidden" id="tag-bar" role="group" aria-label="분류로 거르기"></div>
       <div id="wish-list" class="list"></div>
@@ -439,6 +445,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=43"></script>
+<script src="app.js?v=45"></script>
 </body>
 </html>

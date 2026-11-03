@@ -731,7 +731,14 @@ const WISH_CAT_META = {
   food:  { icon: 'food', label: '음식', long: '먹고 싶은 음식', done: '먹었어요',   hint: '가게 이름, 메뉴 등' },
   gift:  { icon: 'bag',  label: '물건', long: '갖고 싶은 것',   done: '샀어요',     hint: '사이즈, 색상, 가격대 등' },
 };
-const wishUi = { state: 'open', query: '', tag: '', rendered: false, known: new Set() };
+const WISH_DONE_WORD = { all: '완료', place: '다녀옴', food: '먹음', gift: '산 것' };
+const WISH_DONE_EMPTY = {
+  all: '<b>아직 이룬 찜이 없어요</b>찜을 이루면 여기에 따로 모여요.',
+  place: '<b>아직 다녀온 곳이 없어요</b>다녀오면 여기에 따로 모여요.',
+  food: '<b>아직 먹어본 게 없어요</b>먹고 나면 여기에 따로 모여요.',
+  gift: '<b>아직 산 게 없어요</b>사고 나면 여기에 따로 모여요.',
+};
+const wishUi = { state: 'open', query: '', tag: '', sort: (() => { try { return localStorage.getItem('wishSort') || 'new'; } catch (e) { return 'new'; } })(), rendered: false, known: new Set() };
 
 const wishColl = () => db.collection('families').doc(state.familyId).collection('wishes');
 const catOf = (w) => (WISH_CATEGORIES.includes(w.category) ? w.category : 'gift');
@@ -1231,6 +1238,28 @@ function buildWishRow(w, ignite) {
   return row;
 }
 
+// 정렬: 가격은 메모의 "가격 12,000원"에서 읽는다. 가격이 없는 항목은 맨 뒤로.
+const wishPrice = (w) => { const m = (w.notes || '').match(/가격\s*([\d,]+)\s*원/); return m ? Number(m[1].replace(/,/g, '')) : null; };
+function wishSorter(mode) {
+  const byName = (a, b) => (a.title || '').localeCompare(b.title || '', 'ko');
+  const price = (dir) => (a, b) => {
+    const pa = wishPrice(a), pb = wishPrice(b);
+    if (pa === null && pb === null) return byName(a, b);
+    if (pa === null) return 1;
+    if (pb === null) return -1;
+    return (pa - pb) * dir || byName(a, b);
+  };
+  if (mode === 'old') return (a, b) => tsSeconds(a.createdAt) - tsSeconds(b.createdAt);
+  if (mode === 'name') return byName;
+  if (mode === 'low') return price(1);
+  if (mode === 'high') return price(-1);
+  return (a, b) => tsSeconds(b.createdAt) - tsSeconds(a.createdAt);
+}
+document.getElementById('wish-sort').addEventListener('change', (e) => {
+  wishUi.sort = e.target.value;
+  try { localStorage.setItem('wishSort', wishUi.sort); } catch (err) {}
+  renderWishes();
+});
 function renderWishes() {
   renderRequestStatus();
   const list = document.getElementById('wish-list');
@@ -1253,6 +1282,8 @@ function renderWishes() {
   document.getElementById('seg-open').textContent = inCat.filter(w => !w.done).length;
   document.getElementById('seg-done').textContent = inCat.filter(w => w.done).length;
   document.querySelectorAll('#wish-state-seg button').forEach(b => b.classList.toggle('on', b.dataset.wstate === wishUi.state));
+  const doneBtn = document.querySelector('#wish-state-seg [data-wstate="done"]');
+  if (doneBtn && doneBtn.firstChild) doneBtn.firstChild.nodeValue = WISH_DONE_WORD[filter] + ' ';
 
   const wantDone = wishUi.state === 'done';
   let items = inCat.filter(w => !!w.done === wantDone);
@@ -1263,13 +1294,15 @@ function renderWishes() {
   if (wishUi.query) {
     items = items.filter(w => `${w.title || ''} ${w.tag || ''} ${w.notes || ''}`.toLowerCase().includes(wishUi.query));
   }
-  items.sort((a, b) => tsSeconds(b.createdAt) - tsSeconds(a.createdAt));
+  items.sort(wishSorter(wishUi.sort));
+  const sortSel = document.getElementById('wish-sort');
+  if (sortSel.value !== wishUi.sort) sortSel.value = wishUi.sort;
 
   list.innerHTML = '';
   if (items.length === 0) {
     let msg;
     if (wishUi.query) msg = `<b>찾는 찜이 없어요</b>"${escapeHtml(wishUi.query)}"에 맞는 이름이나 메모가 없어요.`;
-    else if (wantDone) msg = '<b>아직 다녀온 곳이 없어요</b>찜을 이루면 여기에 따로 모여요.';
+    else if (wantDone) msg = WISH_DONE_EMPTY[filter];
     else if (all.length === 0) msg = '<b>아직 담아둔 게 없어요</b>아래 + 버튼으로 첫 찜을 담아보세요.';
     else msg = '<b>이 종류는 비어있어요</b>다른 종류를 보거나 새로 담아보세요.';
     list.innerHTML = `<p class="empty-state">${msg}</p>`;
