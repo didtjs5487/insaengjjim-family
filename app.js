@@ -670,7 +670,7 @@ function renderArchive() {
   });
 }
 document.querySelectorAll('#archive-seg button').forEach(btn => {
-  btn.addEventListener('click', () => { archiveUi.kind = btn.dataset.akind; renderArchive(); staggerList(document.getElementById('archive-list')); });
+  btn.addEventListener('click', () => { archiveUi.kind = btn.dataset.akind; renderArchive(); });
 });
 
 /* ===================== Shopping / household supplies ===================== */
@@ -937,7 +937,6 @@ document.getElementById('tag-bar').addEventListener('click', (e) => {
   if (!b) return;
   wishUi.tag = b.dataset.tag;
   renderWishes();
-  staggerList(document.getElementById('wish-list'));
 });
 // 예전에 가져온 목록은 분류가 메모 글자("테크 · 스탠드·거치대 · …")에만 들어 있었다 — 진짜 분류 칸으로 한 번 옮긴다
 function migrateTagsFromNotes() {
@@ -1184,11 +1183,10 @@ document.querySelectorAll('.cat-tile').forEach(tile => {
     state.wishFilter = state.wishFilter === tile.dataset.cat ? 'all' : tile.dataset.cat;
     wishUi.tag = '';
     renderWishes();
-    staggerList(document.getElementById('wish-list'));
   });
 });
 document.querySelectorAll('#wish-state-seg button').forEach(btn => {
-  btn.addEventListener('click', () => { wishUi.state = btn.dataset.wstate; renderWishes(); staggerList(document.getElementById('wish-list')); });
+  btn.addEventListener('click', () => { wishUi.state = btn.dataset.wstate; renderWishes(); });
 });
 document.getElementById('wish-search').addEventListener('input', (e) => {
   wishUi.query = e.target.value.trim().toLowerCase();
@@ -1217,18 +1215,18 @@ function buildWishRow(w, ignite) {
   const src = wishImageSrc(w);
   const row = document.createElement('button');
   row.type = 'button';
-  row.className = 'wish-row' + (w.done ? ' off' : '') + (ignite ? ' ignite' : '');
+  row.className = 'wish-row' + (src ? '' : ' no-thumb') + (w.done ? ' off' : '') + (ignite ? ' ignite' : '');
   row.dataset.cat = cat;
   const date = shortDate(w.done && w.doneAt ? w.doneAt : w.createdAt);
   row.innerHTML = `
-    <span class="wish-thumb">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : icon(meta.icon, 'ic-lg')}</span>
+    ${src ? `<span class="wish-thumb"><img src="${escapeHtml(src)}" alt="" loading="lazy"></span>` : ''}
     <span class="wish-main">
       <span class="wish-title">${escapeHtml(w.title)}</span>
       ${(w.tag || w.notes) ? `<span class="wish-note">${w.tag ? `<b class="wish-tag">${escapeHtml(w.tag)}</b>` : ''}${escapeHtml(rowNote(w.notes))}</span>` : ''}
     </span>
-    <span class="wish-side">${icon(meta.icon)}<span class="wish-date">${date}</span></span>`;
+    <span class="wish-side">${src ? icon(meta.icon) : ''}<span class="wish-date">${date}</span></span>`;
   const img = row.querySelector('img');
-  if (img) img.addEventListener('error', () => { row.querySelector('.wish-thumb').innerHTML = icon(meta.icon, 'ic-lg'); });
+  if (img) img.addEventListener('error', () => { row.querySelector('.wish-thumb')?.remove(); row.classList.add('no-thumb'); });
   row.addEventListener('click', () => openWishModal(w));
   return row;
 }
@@ -1258,7 +1256,8 @@ function renderWishes() {
 
   const wantDone = wishUi.state === 'done';
   let items = inCat.filter(w => !!w.done === wantDone);
-  renderTagBar(items);
+  if (filter === 'all') { wishUi.tag = ''; const tb = document.getElementById('tag-bar'); tb.classList.add('hidden'); tb.innerHTML = ''; }
+  else renderTagBar(items);
   if (wishUi.tag === '__none') items = items.filter(w => !w.tag);
   else if (wishUi.tag) items = items.filter(w => w.tag === wishUi.tag);
   if (wishUi.query) {
