@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gugi&family=JetBrains+Mono:wght@500&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=33">
 </head>
 <body>
 
@@ -157,6 +157,7 @@
         </div>
         <span class="sort-note">최신순</span>
       </div>
+      <div class="tag-bar hidden" id="tag-bar" role="group" aria-label="분류로 거르기"></div>
       <div id="wish-list" class="list"></div>
     </div>
 
@@ -250,6 +251,8 @@
         <button type="button" data-wish-cat="food" data-cat="food"><svg class="ic ic-sm"><use href="#i-food"/></svg>음식</button>
         <button type="button" data-wish-cat="gift" data-cat="gift"><svg class="ic ic-sm"><use href="#i-bag"/></svg>물건</button>
       </div>
+      <input type="text" id="wish-tag" aria-label="분류 (선택)" placeholder="분류 (선택) 예: 스탠드·거치대" autocomplete="off" enterkeyhint="next">
+      <div class="tag-suggest" id="wish-tag-suggest"></div>
       <label class="field-label" for="wish-notes">상세정보</label>
       <input type="text" id="wish-notes" placeholder="위치, 특징 등" autocomplete="off">
       <label class="field-label" for="wish-link">링크</label>
@@ -314,6 +317,8 @@
           <button type="button" data-wish-cat="food" data-cat="food"><svg class="ic ic-sm"><use href="#i-food"/></svg>음식</button>
           <button type="button" data-wish-cat="gift" data-cat="gift"><svg class="ic ic-sm"><use href="#i-bag"/></svg>물건</button>
         </div>
+        <input type="text" id="wish-detail-tag-input" aria-label="분류 (선택)" placeholder="분류 (선택)" autocomplete="off">
+        <div class="tag-suggest" id="wish-detail-tag-suggest"></div>
         <label class="field-label" for="wish-detail-notes-input">상세정보</label>
         <input type="text" id="wish-detail-notes-input" autocomplete="off">
         <label class="field-label" for="wish-detail-link-input">링크</label>
@@ -424,6 +429,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="app.js?v=39"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>

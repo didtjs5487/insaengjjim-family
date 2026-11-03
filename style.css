@@ -413,8 +413,15 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
 .modal-overlay:not(.hidden) { animation: fade-in .2s ease-out; }
 
 /* ===== 네온 간판 글자: 흰 심지 + 분홍 빛, 가끔 '생' 한 글자만 깜빡 ===== */
-.tube { --glow: #ff2e88; color: #fff6fa;
-  text-shadow: 0 0 1px #fff, 0 0 3px color-mix(in srgb, var(--glow) 85%, transparent), 0 0 9px color-mix(in srgb, var(--glow) 45%, transparent); }
+.tube { --glow: #ff2e88; color: #fff; -webkit-text-stroke: .7px #ff5fa6; paint-order: stroke fill;
+  text-shadow: 0 0 1px #fff, 0 0 3px var(--glow), 0 0 7px color-mix(in srgb, var(--glow) 75%, transparent), 0 0 14px color-mix(in srgb, var(--glow) 28%, transparent); }
+.brand-small.tube { position: relative; padding-bottom: 5px; }
+.brand-small.tube::after, .brand.tube::after {
+  content: ''; position: absolute; left: 3%; right: 3%; bottom: 0; height: 2px; border-radius: 2px; background: #eaffff;
+  box-shadow: 0 0 2px #fff, 0 0 4px #19f0ff, 0 0 9px color-mix(in srgb, #19f0ff 60%, transparent);
+}
+.brand.tube { position: relative; display: block; width: fit-content; margin: 0 auto 14px; padding-bottom: 8px; }
+.brand.tube::after { height: 3px; }
 .tube > span { display: inline-block; }
 @keyframes tube-flicker {
   0%, 17%, 21%, 55%, 58%, 100% { opacity: 1; text-shadow: inherit; }
@@ -424,10 +431,36 @@ select { appearance: none; -webkit-appearance: none; padding-right: 38px;
   56% { opacity: .4; text-shadow: 0 0 2px rgba(255,255,255,.4); }
   57% { opacity: 1; }
 }
-.tube .fl { animation: tube-flicker 9s linear infinite; animation-delay: 1.4s; }
-@media (prefers-reduced-motion: reduce) { .tube .fl, .brand-small { animation: none; } }
+.tube .fl { animation: tube-buzz 8s linear infinite; animation-delay: 1.4s; }
+@media (prefers-reduced-motion: reduce) { .tube .fl, .brand-small, .brand.tube { animation: none; } }
 
 /* ===== 찜 → 장보기 옮기기 / 장보기 링크 ===== */
 .detail-move { padding: 10px 20px 0; }
 .detail-move .btn { width: 100%; }
 .shopping-link { font-size: 12.5px; font-weight: 700; color: var(--cyan); text-decoration: none; }
+
+/* ===== 분류(태그) ===== */
+.field-label .opt { color: var(--muted); font-weight: 400; font-size: 12px; }
+.tag-bar { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 12px; margin: 0 -20px; padding-left: 20px; padding-right: 20px; scrollbar-width: none; }
+.tag-bar::-webkit-scrollbar { display: none; }
+.tag-chip {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 13px; border-radius: 99px; cursor: pointer;
+  background: transparent; color: var(--muted); border: 1px solid var(--line-2); font-weight: 700; font-size: 13.5px; white-space: nowrap;
+}
+.tag-chip .num { font-family: var(--font-data); font-size: 12px; opacity: .85; }
+.tag-chip.on { color: var(--text); border-color: var(--text); background: rgba(255,255,255,0.1); }
+.tag-suggest { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.tag-suggest:empty { display: none; }
+.tag-pill { min-height: 32px; padding: 0 11px; border-radius: 99px; cursor: pointer; background: transparent; color: var(--muted); border: 1px solid var(--line-2); font-weight: 700; font-size: 13px; }
+.tag-pill.on { color: var(--ground); background: var(--c, var(--text)); border-color: transparent; }
+.wish-tag { color: var(--c); font-weight: 700; margin-right: 7px; }
+
+/* ===== 지지직: 가끔 '생' 글자만 불안정하게 떨린다 ===== */
+@keyframes tube-buzz {
+  0%, 11%, 24%, 55%, 70%, 100% { opacity: 1; transform: none; }
+  11.4% { opacity: .2; transform: translateX(.7px); } 11.9% { opacity: 1; transform: translateX(-.7px); }
+  12.4% { opacity: .35; transform: translateX(.5px); } 12.9% { opacity: 1; transform: none; }
+  13.6% { opacity: .15; } 14.2% { opacity: 1; } 15.2% { opacity: .55; } 15.8% { opacity: 1; }
+  55.4% { opacity: .3; transform: translateX(-.6px); } 56% { opacity: 1; transform: none; }
+  56.6% { opacity: .25; transform: translateX(.6px); } 57.2% { opacity: 1; transform: none; }
+}

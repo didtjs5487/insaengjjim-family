@@ -332,6 +332,7 @@ function enterFamily(familyId) {
       state.wishes = {};
       snap.forEach(doc => { state.wishes[doc.id] = { id: doc.id, ...doc.data() }; });
       renderWishes();
+      migrateTagsFromNotes();
     });
 
   showScreen('screen-app');
@@ -730,7 +731,7 @@ const WISH_CAT_META = {
   food:  { icon: 'food', label: '음식', long: '먹고 싶은 음식', done: '먹었어요',   hint: '가게 이름, 메뉴 등' },
   gift:  { icon: 'bag',  label: '물건', long: '갖고 싶은 것',   done: '샀어요',     hint: '사이즈, 색상, 가격대 등' },
 };
-const wishUi = { state: 'open', query: '', rendered: false, known: new Set() };
+const wishUi = { state: 'open', query: '', tag: '', rendered: false, known: new Set() };
 
 const wishColl = () => db.collection('families').doc(state.familyId).collection('wishes');
 const catOf = (w) => (WISH_CATEGORIES.includes(w.category) ? w.category : 'gift');
@@ -862,6 +863,7 @@ function setWishCatPicker(cat) {
   selectedWishCat = cat;
   localStorage.setItem('wishCat', cat);
   paintPicker('wish-cat-picker', cat);
+  renderTagSuggest('wish-tag-suggest', 'wish-tag', cat);
   document.getElementById('wish-notes').placeholder = WISH_CAT_META[cat].hint;
   const card = document.getElementById('wish-add-card');
   if (card) card.dataset.cat = cat;
@@ -873,6 +875,7 @@ document.querySelectorAll('#wish-detail-cat-picker button').forEach(btn => {
   btn.addEventListener('click', () => {
     editingWishCat = btn.dataset.wishCat;
     paintPicker('wish-detail-cat-picker', editingWishCat);
+    renderTagSuggest('wish-detail-tag-suggest', 'wish-detail-tag-input', editingWishCat);
     document.getElementById('wish-detail-notes-input').placeholder = WISH_CAT_META[editingWishCat].hint;
   });
 });
@@ -891,6 +894,69 @@ function guessWishCategory(url, text) {
   return null;
 }
 
+/* ---- 분류(태그): 같은 종류 안에서 다시 묶어 보기 ---- */
+function tagList(cat) {
+  const m = {};
+  Object.values(state.wishes).forEach(w => { if (w.tag && (!cat || catOf(w) === cat)) m[w.tag] = (m[w.tag] || 0) + 1; });
+  return Object.keys(m).sort((a, b) => m[b] - m[a] || a.localeCompare(b, 'ko'));
+}
+function markTagSuggest(boxId, val) {
+  document.querySelectorAll('#' + boxId + ' .tag-pill').forEach(b => b.classList.toggle('on', b.textContent === val));
+}
+function renderTagSuggest(boxId, inputId, cat) {
+  const box = document.getElementById(boxId), input = document.getElementById(inputId);
+  if (!box || !input) return;
+  box.innerHTML = '';
+  tagList(cat).slice(0, 14).forEach(t => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tag-pill'; b.textContent = t;
+    b.addEventListener('click', () => { input.value = input.value.trim() === t ? '' : t; markTagSuggest(boxId, input.value.trim()); });
+    box.appendChild(b);
+  });
+  markTagSuggest(boxId, input.value.trim());
+}
+[['wish-tag', 'wish-tag-suggest'], ['wish-detail-tag-input', 'wish-detail-tag-suggest']].forEach(([inp, box]) => {
+  document.getElementById(inp).addEventListener('input', (e) => markTagSuggest(box, e.target.value.trim()));
+});
+function renderTagBar(items) {
+  const bar = document.getElementById('tag-bar');
+  const counts = {}; let none = 0;
+  items.forEach(w => { if (w.tag) counts[w.tag] = (counts[w.tag] || 0) + 1; else none++; });
+  const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'ko'));
+  if (!tags.length) { wishUi.tag = ''; bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+  if (wishUi.tag && wishUi.tag !== '__none' && !counts[wishUi.tag]) wishUi.tag = '';
+  if (wishUi.tag === '__none' && !none) wishUi.tag = '';
+  const keep = bar.scrollLeft;
+  const chip = (val, label, n) => `<button type="button" class="tag-chip${wishUi.tag === val ? ' on' : ''}" data-tag="${escapeHtml(val)}">${escapeHtml(label)}<span class="num">${n}</span></button>`;
+  bar.innerHTML = chip('', '전체', items.length) + tags.map(t => chip(t, t, counts[t])).join('') + (none ? chip('__none', '분류 없음', none) : '');
+  bar.classList.remove('hidden');
+  bar.scrollLeft = keep;
+}
+document.getElementById('tag-bar').addEventListener('click', (e) => {
+  const b = e.target.closest('.tag-chip');
+  if (!b) return;
+  wishUi.tag = b.dataset.tag;
+  renderWishes();
+  staggerList(document.getElementById('wish-list'));
+});
+// 예전에 가져온 목록은 분류가 메모 글자("테크 · 스탠드·거치대 · …")에만 들어 있었다 — 진짜 분류 칸으로 한 번 옮긴다
+function migrateTagsFromNotes() {
+  if (state._tagMigrating || !state.familyId) return;
+  const todo = [];
+  Object.values(state.wishes).forEach(w => {
+    if (w.tag || !w.notes) return;
+    const m = w.notes.match(/^(테크|데스크테리어) · (.+?)(?: · (.*))?$/);
+    if (m) todo.push([w, m]);
+  });
+  if (!todo.length) return;
+  state._tagMigrating = true;
+  const batch = db.batch();
+  todo.slice(0, 400).forEach(([w, m]) => {
+    batch.update(wishColl().doc(w.id), { tag: m[2].trim(), notes: m[3] ? `${m[1]} · ${m[3]}` : m[1] });
+  });
+  batch.commit().catch(() => {}).finally(() => { state._tagMigrating = false; });
+}
+
 /* ---- add sheet ---- */
 const wishAddModal = document.getElementById('modal-wish-add');
 function openWishAdd(prefill = {}) {
@@ -899,7 +965,11 @@ function openWishAdd(prefill = {}) {
   document.getElementById('wish-title').value = prefill.title || '';
   document.getElementById('wish-notes').value = '';
   document.getElementById('wish-link').value = prefill.link || '';
-  setWishCatPicker(prefill.cat || selectedWishCat);
+  let cat0 = prefill.cat;
+  if (!cat0 && wishUi.tag && wishUi.tag !== '__none') { const hit = Object.values(state.wishes).find(w => w.tag === wishUi.tag); if (hit) cat0 = catOf(hit); }
+  setWishCatPicker(cat0 || selectedWishCat);
+  document.getElementById('wish-tag').value = prefill.tag != null ? prefill.tag : ((wishUi.tag && wishUi.tag !== '__none') ? wishUi.tag : '');
+  renderTagSuggest('wish-tag-suggest', 'wish-tag', selectedWishCat);
   const meta = WISH_CAT_META[selectedWishCat];
   document.getElementById('wish-cat-picker').classList.toggle('hidden', !pickable);
   document.getElementById('wish-add-card').dataset.cat = selectedWishCat;
@@ -971,6 +1041,7 @@ document.getElementById('form-wish-add').addEventListener('submit', async (e) =>
   try {
     await wishColl().add({
       title, category: selectedWishCat,
+      tag: document.getElementById('wish-tag').value.trim() || null,
       notes: document.getElementById('wish-notes').value.trim() || null,
       link: normalizeLink(document.getElementById('wish-link').value),
       photo: photoSlots.add.data || null,
@@ -978,7 +1049,7 @@ document.getElementById('form-wish-add').addEventListener('submit', async (e) =>
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     closeWishAdd();
-    state.wishFilter = 'all'; wishUi.state = 'open'; wishUi.query = '';
+    state.wishFilter = 'all'; wishUi.state = 'open'; wishUi.query = ''; wishUi.tag = '';
     document.getElementById('wish-search').value = '';
     renderWishes();
     toast(`"${title}" 담았어요`);
@@ -993,7 +1064,8 @@ document.getElementById('form-wish-add').addEventListener('submit', async (e) =>
 /* ---- 목록 가져오기: 붙여넣은 여러 줄을 한 번에 찜으로 ---- */
 const IMPORT_HEADERS = [
   ['title', /^(이름|제목|품명|상품명|제품명|물건|품목|항목)$/],
-  ['detail', /^(세부|세부분류|분류|종류|카테고리|상세|메모|비고|설명)$/],
+  ['tag', /^(세부분류|세부|소분류)$/],
+  ['detail', /^(분류|종류|카테고리|상세|메모|비고|설명)$/],
   ['link', /^(링크|url|주소|사이트)$/i],
   ['price', /^(가격|금액|단가)$/],
   ['status', /^상태$/],
@@ -1022,7 +1094,7 @@ function parseImportText(text, cat) {
   const items = [];
   lines.forEach(line => {
     const cells = split(line);
-    let title = '', link = null, price = null, done = false, photo = null;
+    let title = '', link = null, price = null, done = false, photo = null, tag = null;
     const details = [];
     if (cells.length === 1) {
       const url = cells[0].match(/https?:\/\/\S+/);
@@ -1033,6 +1105,7 @@ function parseImportText(text, cat) {
         if (!cell) return;
         const role = map ? map[idx] : (idx === 0 ? 'title' : null);
         if (role === 'title') title = cell;
+        else if (role === 'tag') tag = cell;
         else if (role === 'status') { if (IMPORT_DONE.test(cell)) done = true; else if (cell !== '후보' && cell !== '보류') details.push(cell); }
         else if (role === 'photo' || (!role && IMPORT_IMG.test(cell))) { if (/^https?:/i.test(cell)) photo = cell; }
         else if (role === 'link' || (!role && /^https?:\/\//i.test(cell))) link = normalizeLink(cell);
@@ -1046,7 +1119,7 @@ function parseImportText(text, cat) {
     const dup = existing.has(key) || seen.has(key);
     seen.add(key);
     const notes = [details.join(' · '), price ? '가격 ' + price : ''].filter(Boolean).join(' · ') || null;
-    items.push({ title, notes, link, photo, done, dup });
+    items.push({ title, notes, tag, link, photo, done, dup });
   });
   return items;
 }
@@ -1084,7 +1157,7 @@ document.getElementById('btn-import').addEventListener('click', async (e) => {
       fresh.slice(start, start + 400).forEach((it, k) => {
         const stamp = firebase.firestore.Timestamp.fromMillis(now - (start + k) * 1000);
         batch.set(wishColl().doc(), {
-          title: it.title, category: cat, notes: it.notes, link: it.link, photo: it.photo || null,
+          title: it.title, category: cat, tag: it.tag || null, notes: it.notes, link: it.link, photo: it.photo || null,
           done: it.done, doneBy: it.done ? state.memberId : null, doneAt: it.done ? stamp : null,
           requestedBy: state.memberId, createdAt: stamp,
         });
@@ -1093,7 +1166,7 @@ document.getElementById('btn-import').addEventListener('click', async (e) => {
     }
     document.getElementById('import-text').value = '';
     refreshImportSummary();
-    state.wishFilter = 'all'; wishUi.state = 'open'; wishUi.query = '';
+    state.wishFilter = 'all'; wishUi.state = 'open'; wishUi.query = ''; wishUi.tag = '';
     document.getElementById('wish-search').value = '';
     toast(`${fresh.length}개 넣었어요`);
     showTab('request');
@@ -1109,6 +1182,7 @@ document.getElementById('btn-import').addEventListener('click', async (e) => {
 document.querySelectorAll('.cat-tile').forEach(tile => {
   tile.addEventListener('click', () => {
     state.wishFilter = state.wishFilter === tile.dataset.cat ? 'all' : tile.dataset.cat;
+    wishUi.tag = '';
     renderWishes();
     staggerList(document.getElementById('wish-list'));
   });
@@ -1150,7 +1224,7 @@ function buildWishRow(w, ignite) {
     <span class="wish-thumb">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : icon(meta.icon, 'ic-lg')}</span>
     <span class="wish-main">
       <span class="wish-title">${escapeHtml(w.title)}</span>
-      ${w.notes ? `<span class="wish-note">${escapeHtml(rowNote(w.notes))}</span>` : ''}
+      ${(w.tag || w.notes) ? `<span class="wish-note">${w.tag ? `<b class="wish-tag">${escapeHtml(w.tag)}</b>` : ''}${escapeHtml(rowNote(w.notes))}</span>` : ''}
     </span>
     <span class="wish-side">${icon(meta.icon)}<span class="wish-date">${date}</span></span>`;
   const img = row.querySelector('img');
@@ -1184,8 +1258,11 @@ function renderWishes() {
 
   const wantDone = wishUi.state === 'done';
   let items = inCat.filter(w => !!w.done === wantDone);
+  renderTagBar(items);
+  if (wishUi.tag === '__none') items = items.filter(w => !w.tag);
+  else if (wishUi.tag) items = items.filter(w => w.tag === wishUi.tag);
   if (wishUi.query) {
-    items = items.filter(w => `${w.title || ''} ${w.notes || ''}`.toLowerCase().includes(wishUi.query));
+    items = items.filter(w => `${w.title || ''} ${w.tag || ''} ${w.notes || ''}`.toLowerCase().includes(wishUi.query));
   }
   items.sort((a, b) => tsSeconds(b.createdAt) - tsSeconds(a.createdAt));
 
@@ -1252,7 +1329,7 @@ function openWishModal(w) {
   else { img.removeAttribute('src'); img.classList.add('hidden'); fallback.classList.remove('hidden'); }
   img.onerror = () => { img.classList.add('hidden'); fallback.classList.remove('hidden'); };
 
-  document.getElementById('wish-detail-tag').innerHTML = `${icon(meta.icon, 'ic-sm')}${meta.long}`;
+  document.getElementById('wish-detail-tag').innerHTML = `${icon(meta.icon, 'ic-sm')}${meta.long}${w.tag ? ' · ' + escapeHtml(w.tag) : ''}`;
   document.getElementById('wish-detail-title').textContent = w.title || '';
   const date = shortDate(w.createdAt);
   document.getElementById('wish-detail-meta').textContent = `${requester?.name || '?'} 담음${date ? ' · ' + date : ''}`;
@@ -1317,6 +1394,8 @@ document.getElementById('btn-edit-wish').addEventListener('click', () => {
   notes.value = w.notes || '';
   notes.placeholder = WISH_CAT_META[editingWishCat].hint;
   document.getElementById('wish-detail-link-input').value = w.link || '';
+  document.getElementById('wish-detail-tag-input').value = w.tag || '';
+  renderTagSuggest('wish-detail-tag-suggest', 'wish-detail-tag-input', editingWishCat);
   photoSlots.edit.data = w.photo || null;
   renderPhotoSlot('edit');
   showWishViewMode(false);
@@ -1331,6 +1410,7 @@ document.getElementById('form-wish-edit').addEventListener('submit', async (e) =
   try {
     await wishColl().doc(editingWishId).update({
       title, category: editingWishCat,
+      tag: document.getElementById('wish-detail-tag-input').value.trim() || null,
       notes: document.getElementById('wish-detail-notes-input').value.trim() || null,
       link: normalizeLink(document.getElementById('wish-detail-link-input').value),
       photo: photoSlots.edit.data || null,
